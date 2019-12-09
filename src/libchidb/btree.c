@@ -42,7 +42,7 @@
  *
  */
 
-
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -79,7 +79,65 @@
  */
 int chidb_Btree_open(const char *filename, chidb *db, BTree **bt)
 {
-    /* Your code goes here */
+    Pager *pager;
+    int rt;
+
+    uint8_t magic_number[] = {0x01,0x01,0x00,0x40,0x20,0x20};
+    uint8_t zero4[] = {0,0,0,0};
+    uint8_t zero3one1[] = {0,0,0,1};
+    uint32_t page_cache_size = 20000;
+
+    if(rt = chidb_Pager_open(&pager, filename)) {
+        return rt;
+    }
+
+    *bt = (Btree *)malloc(sizeof(Btree));
+    if(*bt == NULL) {
+        return CHIDB_ENOMEM;
+    }
+
+    (*bt)->db = db;
+    (*bt)->pager = pager;
+    db->bt = *bt;
+
+    struct stat f_att;
+    fstat(fileno(pager->f), &f_att);
+
+    if(f_att.st_size) {
+        uint8_t file_header[100];
+        if(rt = chidb_Pager_readHeader(pager, file_header)) {
+            return CHIDB_ECORRUPTHEADER;
+        }
+
+        if(!memcmp(file_header, "SQLite format 3", 16) &&
+           !memcmp(file_header + 0x12, magic_number, 6) &&
+           !memcmp(file_header + 0x18, zero4, 4) &&
+           !memcmp(file_header + 0x20, zero4, 4) &&
+           !memcmp(file_header + 0x24, zero4, 4) &&
+           !memcmp(file_header + 0x28, zero4, 4) &&
+           !memcmp(file_header + 0x2c, zero3one1, 4) &&
+           !memcmp(file_header + 0x30, &page_cache_size, 4) &&
+           !memcmp(file_header + 0x34, zero4, 4) &&
+           !memcmp(file_header + 0x38, zero3one1, 4) &&
+           !memcmp(file_header + 0x3c, zero4, 4) &&
+           !memcmp(file_header + 0x40, zero4, 4)) {
+            
+            uint16_t page_size = get2byte(file_header + 0x10);
+            chidb_Pager_setPageSize(pager, page_size);
+            chidb_Pager_getRealDBSize(pager, &(pager->n_pages));
+        }
+        else {
+            return CHIDB_ECORRUPTHEADER;
+        }
+    }
+    else {
+        chidb_Pager_setPageSize(pager, DEFAULT_PAGE_SIZE);
+        pager->n_pages = 0;
+        int npages;
+        if(rt = chidb_Btree_newNode(*bt, &npages, PGTYPE_TABLE_LEAF)) {
+            return rt;
+        }
+    }
 
     return CHIDB_OK;
 }
