@@ -295,7 +295,7 @@ int chidb_Btree_newNode(BTree *bt, npage_t *npage, uint8_t type)
     if(rt = chidb_Pager_allocatePage(bt->pager, npage)) {
         return rt;
     }
-    if(rt = chidb_Btree_initEmptyNode(bt, npage, type)) {
+    if(rt = chidb_Btree_initEmptyNode(bt, *npage, type)) {
         return rt;
     }
     return CHIDB_OK;
