@@ -55,6 +55,42 @@
 #include "util.h"
 
 
+/* Check if a BTreeNode have enough space for a new cell
+ *
+ * Parameters
+ * - btn: btn: BTreeNode to free
+ * - btc: BTreeCell to insert into B-Tree
+ * 
+ * Return
+ * - non-0: The BTreeNode not have enough space for inserting btc
+ * - 0: The BTreeNode have enough space for inserting btc
+ */
+int if_BTreeNode_Full(BTreeNode *btn, BTreeCell *btc)
+{
+    uint16_t space = btn->cells_offset - btn->free_offset;
+    uint16_t need_size;
+    switch (btc->type)
+    {
+    case PGTYPE_TABLE_INTERNAL:
+        need_size = TABLEINTCELL_SIZE;
+        break;
+    case PGTYPE_TABLE_LEAF:
+        need_size = TABLELEAFCELL_SIZE_WITHOUTDATA + btc->fields.tableLeaf.data_size;
+        break;
+    case PGTYPE_INDEX_INTERNAL:
+        need_size = INDEXINTCELL_SIZE;
+        break;
+    case PGTYPE_INDEX_LEAF:
+        need_size = INDEXLEAFCELL_SIZE;
+        break;
+    default:
+        need_size = 0;
+        break;
+    }
+
+    return space < need_size + 2;
+}
+
 /* Open a B-Tree file
  *
  * This function opens a database file and verifies that the file
@@ -112,15 +148,16 @@ int chidb_Btree_open(const char *filename, chidb *db, BTree **bt)
         if(!memcmp(file_header, "SQLite format 3", 16) &&
            !memcmp(file_header + 0x12, magic_number, 6) &&
            !memcmp(file_header + 0x18, zero4, 4) &&
-           !memcmp(file_header + 0x20, zero4, 4) &&
-           !memcmp(file_header + 0x24, zero4, 4) &&
+        //    !memcmp(file_header + 0x20, zero4, 4) &&
+        //    !memcmp(file_header + 0x24, zero4, 4) &&
            !memcmp(file_header + 0x28, zero4, 4) &&
-           !memcmp(file_header + 0x2c, zero3one1, 4) &&
+        //    !memcmp(file_header + 0x2c, zero3one1, 4) &&
            !memcmp(file_header + 0x30, &page_cache_size, 4) &&
-           !memcmp(file_header + 0x34, zero4, 4) &&
-           !memcmp(file_header + 0x38, zero3one1, 4) &&
-           !memcmp(file_header + 0x3c, zero4, 4) &&
-           !memcmp(file_header + 0x40, zero4, 4)) {
+        //    !memcmp(file_header + 0x34, zero4, 4) &&
+        //    !memcmp(file_header + 0x38, zero3one1, 4) &&
+           !memcmp(file_header + 0x3c, zero4, 4) /* &&
+           !memcmp(file_header + 0x40, zero4, 4) */
+           ) {
             
             uint16_t page_size = get2byte(file_header + 0x10);
             chidb_Pager_setPageSize(pager, page_size);
@@ -511,7 +548,73 @@ int chidb_Btree_insertCell(BTreeNode *btn, ncell_t ncell, BTreeCell *cell)
 int chidb_Btree_find(BTree *bt, npage_t nroot, chidb_key_t key, uint8_t **data, uint16_t *size)
 {
     /* Your code goes here */
+    BTreeCell cell;
+    BTreeNode *btn;
 
+    int rt;
+
+    if(rt = chidb_Btree_getNodeByPage(bt, nroot, &btn)) {
+        return rt;
+    }
+
+    if(btn->type == PGTYPE_TABLE_INTERNAL) {
+        int i;
+        for(i = 0; i < btn->n_cells; i++) {
+            if(rt = chidb_Btree_getCell(btn, i, &cell)) {
+                if(rt = chidb_Btree_freeMemNode(bt, btn)) {
+                    return rt;
+                }
+                return rt;
+            }
+
+            if(cell.key >= key)
+                break;
+        }
+        if(i == btn->n_cells) {
+            if(rt = chidb_Btree_freeMemNode(bt, btn)) {
+                return rt;
+            }
+            return chidb_Btree_find(bt, btn->right_page, key, data, size);
+        }
+        else {
+            if(rt = chidb_Btree_freeMemNode(bt, btn)) {
+                return rt;
+            }
+            return chidb_Btree_find(bt, cell.fields.tableInternal.child_page, key, data, size);
+        }
+    }
+    else {
+        int i;
+        for(i = 0; i < btn->n_cells; i++) {
+            if(rt = chidb_Btree_getCell(btn, i, &cell)) {
+                if(rt = chidb_Btree_freeMemNode(bt, btn)) {
+                    return rt;
+                }
+                return rt;
+            }
+
+            if(cell.key == key)
+                break;
+        }
+        if(i == btn->n_cells) {
+            if(rt = chidb_Btree_freeMemNode(bt, btn)) {
+                return rt;
+            }
+            return CHIDB_ENOTFOUND;
+        } else {
+            *size = cell.fields.tableLeaf.data_size;
+            *data = malloc(*size);
+            if(*data == NULL) {
+                if(rt = chidb_Btree_freeMemNode(bt, btn)) {
+                    return rt;
+                }
+            }
+            memcpy(*data, cell.fields.tableLeaf.data, *size);
+        }
+    }
+    if(rt = chidb_Btree_freeMemNode(bt, btn)) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -540,8 +643,14 @@ int chidb_Btree_find(BTree *bt, npage_t nroot, chidb_key_t key, uint8_t **data, 
 int chidb_Btree_insertInTable(BTree *bt, npage_t nroot, chidb_key_t key, uint8_t *data, uint16_t size)
 {
     /* Your code goes here */
+    BTreeCell cell;
 
-    return CHIDB_OK;
+    cell.type = PGTYPE_TABLE_LEAF;
+    cell.key = key;
+    cell.fields.tableLeaf.data_size = size;
+    cell.fields.tableLeaf.data = data;
+
+    return chidb_Btree_insert(bt, nroot, &cell);
 }
 
 
@@ -567,8 +676,13 @@ int chidb_Btree_insertInTable(BTree *bt, npage_t nroot, chidb_key_t key, uint8_t
 int chidb_Btree_insertInIndex(BTree *bt, npage_t nroot, chidb_key_t keyIdx, chidb_key_t keyPk)
 {
     /* Your code goes here */
+    BTreeCell cell;
 
-    return CHIDB_OK;
+    cell.type = PGTYPE_INDEX_LEAF;
+    cell.key = keyIdx;
+    cell.fields.indexLeaf.keyPk = keyPk;
+
+    return chidb_Btree_insert(bt, nroot, &cell);
 }
 
 
@@ -597,7 +711,7 @@ int chidb_Btree_insertInIndex(BTree *bt, npage_t nroot, chidb_key_t keyIdx, chid
 int chidb_Btree_insert(BTree *bt, npage_t nroot, BTreeCell *btc)
 {
     /* Your code goes here */
-
+    
     return CHIDB_OK;
 }
 
