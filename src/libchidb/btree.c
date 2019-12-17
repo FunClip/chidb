@@ -569,6 +569,10 @@ int chidb_Btree_getCell(BTreeNode *btn, ncell_t ncell, BTreeCell *cell)
 int chidb_Btree_insertCell(BTreeNode *btn, ncell_t ncell, BTreeCell *cell)
 {
     /* Your code goes here */
+    if(ncell < 0 || ncell > btn->n_cells) {
+        return CHIDB_ECELLNO;
+    }
+
     uint16_t cell_offset;
     uint8_t *p = btn->page->data;
     uint8_t index_magic[4] = {0x0b, 0x03, 0x04, 0x04};
@@ -920,8 +924,54 @@ int chidb_Btree_insert(BTree *bt, npage_t nroot, BTreeCell *btc)
 int chidb_Btree_insertNonFull(BTree *bt, npage_t npage, BTreeCell *btc)
 {
     /* Your code goes here */
+    BTreeNode *btn;
+    int rt;
+    BTreeCell cell;
+    int i;
+    npage_t npage_child;
 
-    return CHIDB_OK;
+    if(rt = chidb_Btree_getNodeByPage(bt, npage, &btn)) { return rt; }
+
+    for(i = 0; i < btn->n_cells; i++) {
+        if(rt = chidb_Btree_getCell(btn, i, &cell)) { return rt; }
+        if(cell.key >= btc->key) {
+            break;
+        }
+    }
+
+    if(i == btn->n_cells) {      
+        npage_child = btn->right_page;
+    }
+    else {
+        if(cell.key == btc->key && cell.type == btc->type) {
+            if(rt = chidb_Btree_freeMemNode(bt, btn)) { return rt; }
+            return CHIDB_EDUPLICATE;
+        }
+        npage_child = btn->type == PGTYPE_INDEX_INTERNAL ?
+                        cell.fields.indexInternal.child_page :
+                        cell.fields.tableInternal.child_page;
+    }
+
+    if(cell.type == btc->type) {
+        if(rt = chidb_Btree_insertCell(btn, i, btc)) { return rt; }
+        if(rt = chidb_Btree_writeNode(bt, btn)) { return rt; }
+        if(rt = chidb_Btree_freeMemNode(bt, btn)) { return rt; }
+        return CHIDB_OK;
+    }
+
+    if(rt = chidb_Btree_freeMemNode(bt, btn)) { return rt; }    
+
+    BTreeNode *child;
+    npage_t napge_child2;
+
+    if(rt = chidb_Btree_getNodeByPage(bt, npage_child, &child)) { return rt; }
+    int full = if_BtreeNode_Full(child, btc);
+    if(rt = chidb_Btree_freeMemNode(bt, child)) { return rt; }
+    if(full) {
+        chidb_Btree_split(bt, npage, npage_child, i, &napge_child2);
+        return chidb_Btree_insertNonFull(bt, npage, btc);
+    }
+    return chidb_Btree_insertNonFull(bt, npage_child, btc);
 }
 
 
