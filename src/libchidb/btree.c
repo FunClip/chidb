@@ -943,7 +943,7 @@ int chidb_Btree_insertNonFull(BTree *bt, npage_t npage, BTreeCell *btc)
         }
     }
 
-    if(i == btn->n_cells) {      
+    if(i == btn->n_cells) {
         npage_child = btn->right_page;
     }
     else {
@@ -956,14 +956,14 @@ int chidb_Btree_insertNonFull(BTree *bt, npage_t npage, BTreeCell *btc)
                         cell.fields.tableInternal.child_page;
     }
 
-    if(cell.type == btc->type) {
+    if(btn->type == btc->type) {
         if(rt = chidb_Btree_insertCell(btn, i, btc)) { return rt; }
         if(rt = chidb_Btree_writeNode(bt, btn)) { return rt; }
         if(rt = chidb_Btree_freeMemNode(bt, btn)) { return rt; }
         return CHIDB_OK;
     }
 
-    if(rt = chidb_Btree_freeMemNode(bt, btn)) { return rt; }    
+    if(rt = chidb_Btree_freeMemNode(bt, btn)) { return rt; }
 
     BTreeNode *child;
     npage_t napge_child2;
