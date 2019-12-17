@@ -510,6 +510,10 @@ int chidb_Btree_writeNode(BTree *bt, BTreeNode *btn)
 int chidb_Btree_getCell(BTreeNode *btn, ncell_t ncell, BTreeCell *cell)
 {
     /* Your code goes here */
+    if(ncell < 0 || ncell > btn->n_cells) {
+        return CHIDB_ECELLNO;
+    }
+
     uint8_t *cell_pos = btn->page->data + get2byte(btn->celloffset_array + 2 * ncell);
 
     switch (btn->type)
@@ -609,7 +613,7 @@ int chidb_Btree_insertCell(BTreeNode *btn, ncell_t ncell, BTreeCell *cell)
 
     btn->cells_offset = cell_offset;
     memmove(btn->celloffset_array + 2 * ncell + 2, btn->celloffset_array + 2 * ncell, (btn->n_cells - ncell) * 2);
-    memcpy(btn->celloffset_array + 2 * ncell, &cell_offset, 2);
+    put2byte(btn->celloffset_array + 2 * ncell, cell_offset);
     btn->n_cells++;
     btn->free_offset += 2;
 
