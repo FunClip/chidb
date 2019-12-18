@@ -598,16 +598,16 @@ int chidb_Btree_insertCell(BTreeNode *btn, ncell_t ncell, BTreeCell *cell)
         break;
     case PGTYPE_INDEX_INTERNAL:
         cell_offset = btn->cells_offset - INDEXINTCELL_SIZE;
-        putVarint32(p + cell_offset + INDEXINTCELL_CHILD_OFFSET, cell->fields.indexInternal.child_page);
-        putVarint32(p + cell_offset + INDEXINTCELL_KEYPK_OFFSET, cell->fields.indexInternal.keyPk);
-        putVarint32(p + cell_offset + INDEXINTCELL_KEYIDX_OFFSET, cell->key);
+        put4byte(p + cell_offset + INDEXINTCELL_CHILD_OFFSET, cell->fields.indexInternal.child_page);
+        put4byte(p + cell_offset + INDEXINTCELL_KEYPK_OFFSET, cell->fields.indexInternal.keyPk);
+        put4byte(p + cell_offset + INDEXINTCELL_KEYIDX_OFFSET, cell->key);
         put4byte(p + cell_offset + 4, index_magic);
         break;
     case PGTYPE_INDEX_LEAF:
         cell_offset = btn->cells_offset - INDEXLEAFCELL_SIZE;
         put4byte(p + cell_offset, index_magic);
-        putVarint32(p + cell_offset + INDEXLEAFCELL_KEYIDX_OFFSET, cell->key);
-        putVarint32(p + cell_offset + INDEXLEAFCELL_KEYPK_OFFSET, cell->fields.indexLeaf.keyPk);
+        put4byte(p + cell_offset + INDEXLEAFCELL_KEYIDX_OFFSET, cell->key);
+        put4byte(p + cell_offset + INDEXLEAFCELL_KEYPK_OFFSET, cell->fields.indexLeaf.keyPk);
         break;
     default:
         break;
