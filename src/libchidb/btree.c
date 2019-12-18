@@ -89,7 +89,7 @@ int if_BtreeNode_Full(BTreeNode *btn, BTreeCell *btc)
         break;
     }
 
-    return (space < need_size + 2) ? 1 : 0;
+    return (space < (need_size + 2)) ? 1 : 0;
 }
 
 
@@ -830,7 +830,7 @@ int chidb_Btree_insert(BTree *bt, npage_t nroot, BTreeCell *btc)
         if(rt = chidb_Btree_newNode(bt, &nlchild, root->type)) { return rt; }
         if(rt = chidb_Btree_getNodeByPage(bt, nlchild, &lchild)) { return rt; }
 
-        ncell_t nmid_cell = rchild->n_cells / 2;
+        ncell_t nmid_cell = root->n_cells / 2;
         BTreeCell mid_cell, new_cell;
 
         if(rt = chidb_Btree_getCell(root, nmid_cell, &mid_cell)) { return rt; }
