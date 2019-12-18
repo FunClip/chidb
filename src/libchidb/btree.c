@@ -974,7 +974,9 @@ int chidb_Btree_insertNonFull(BTree *bt, npage_t npage, BTreeCell *btc)
     int full = if_BtreeNode_Full(child, btc);
     if(rt = chidb_Btree_freeMemNode(bt, child)) { return rt; }
     if(full) {
-        chidb_Btree_split(bt, npage, npage_child, i, &napge_child2);
+        if(rt = chidb_Btree_split(bt, npage, npage_child, i, &napge_child2)) {
+            return rt;
+        }
         return chidb_Btree_insertNonFull(bt, npage, btc);
     }
     return chidb_Btree_insertNonFull(bt, npage_child, btc);
@@ -1072,8 +1074,9 @@ int chidb_Btree_split(BTree *bt, npage_t npage_parent, npage_t npage_child, ncel
 
     if(rt = chidb_Btree_insertCell(parent, parent_ncell, &new_cell)) { return rt; }
 
+    uint8_t rchild_type = rchild->type;
     if(rt = chidb_Btree_freeMemNode(bt, rchild)) { return rt; }
-    if(rt = chidb_Btree_initEmptyNode(rchild, npage_child, rchild->type)) { return rt; }
+    if(rt = chidb_Btree_initEmptyNode(bt, npage_child, rchild_type)) { return rt; }
     if(rt = chidb_Btree_getNodeByPage(bt, npage_child, &rchild)) { return rt; }
 
     for(int i = 0; i < temp_node->n_cells; i++) {
@@ -1091,8 +1094,8 @@ int chidb_Btree_split(BTree *bt, npage_t npage_parent, npage_t npage_child, ncel
     if(rt = chidb_Btree_writeNode(bt, lchild)) { return rt; }
 
     if(rt = chidb_Btree_freeMemNode(bt, parent)) { return rt; }
-    if(rt = chidb_Btree_freeMemNode(bt, parent)) { return rt; }
-    if(rt = chidb_Btree_freeMemNode(bt, parent)) { return rt; }
+    if(rt = chidb_Btree_freeMemNode(bt, rchild)) { return rt; }
+    if(rt = chidb_Btree_freeMemNode(bt, lchild)) { return rt; }
     parent = lchild = rchild = NULL;
 
     return CHIDB_OK;
