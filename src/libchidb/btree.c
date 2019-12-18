@@ -102,6 +102,7 @@ int get_tempBtreeNode(Btree *bt, BTreeNode **btn, uint8_t type)
         return CHIDB_ENOMEM;
     }
 
+    (*btn)->page = (MemPage *) malloc(sizeof(MemPage));
     (*btn)->type = type;
     (*btn)->page->npage = 0;
     (*btn)->page->data = malloc(bt->pager->page_size);
@@ -109,7 +110,7 @@ int get_tempBtreeNode(Btree *bt, BTreeNode **btn, uint8_t type)
     (*btn)->n_cells = 0;
     (*btn)->cells_offset = bt->pager->page_size;
     (*btn)->right_page = 0;
-    (*btn)->celloffset_array = 0;
+    (*btn)->celloffset_array = (*btn)->page->data;
     return CHIDB_OK;
 }
 
@@ -119,6 +120,7 @@ int get_tempBtreeNode(Btree *bt, BTreeNode **btn, uint8_t type)
 int free_tempBtreeNode(BTreeNode *btn)
 {
     free(btn->page->data);
+    free(btn->page);
     free(btn);
     return CHIDB_OK;
 }
