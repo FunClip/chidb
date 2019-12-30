@@ -76,7 +76,28 @@ int chidb_dbm_op_handle (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     return dbm_handlers[op->opcode].func(stmt, op);
 }
+/*** TOOL FUNCTIONS ***/
+int realloc_cur(chidb_stmt *stmt, uint32_t size);
+int realloc_reg(chidb_stmt *stmt, uint32_t size);
 
+int chidb_dbm_op_WriteReg(chidb_stmt *stmt, int regNo, int reg_type, void *data)
+{
+    int rt;
+    if (IS_VALID_REGISTER(stmt, regNo) && regNo > stmt->nReg)
+        if(rt = realloc_reg(stmt, regNo)) {
+            return rt;
+        }
+
+    chidb_dbm_register_t *reg = &(stmt->reg[regNo]);
+    reg->type = reg_type;
+
+    if (reg_type == REG_INT32)
+        reg->value.i = *((int32_t *) data);
+    else if (reg_type == REG_STRING)
+        reg->value.s = (char *) data;
+
+    return CHIDB_OK;
+}
 
 /*** INSTRUCTION HANDLER IMPLEMENTATIONS ***/
 
@@ -192,7 +213,10 @@ int chidb_dbm_op_Key (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Integer (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-
+    int rt;
+    if(rt = chidb_dbm_op_WriteReg(stmt, op->p2, REG_INT32, &op->p1)) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -200,7 +224,10 @@ int chidb_dbm_op_Integer (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_String (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-
+    int rt;
+    if(rt = chidb_dbm_op_WriteReg(stmt, op->p2, REG_STRING, strdup(op->p4))) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -208,10 +235,11 @@ int chidb_dbm_op_String (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Null (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-
+    int rt;
+    if(rt = chidb_dbm_op_WriteReg(stmt, op->p2, REG_NULL, NULL)) {
+        return rt;
+    }
     return CHIDB_OK;
-
-    return 0;
 }
 
 
@@ -242,7 +270,26 @@ int chidb_dbm_op_Insert (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Eq (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
 
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    if(reg1->type == REG_INT32 && reg2->type == REG_INT32) {
+        if(reg1->value.i == reg2->value.i) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
+    else if(reg1->type == REG_STRING && reg2->type == REG_STRING) {
+        if(!strncmp(reg1->value.s,reg2->value.s, strlen(reg1->value.s))) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
     return CHIDB_OK;
 }
 
@@ -250,7 +297,26 @@ int chidb_dbm_op_Eq (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Ne (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
 
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    if(reg1->type == REG_INT32 && reg2->type == REG_INT32) {
+        if(reg1->value.i != reg2->value.i) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
+    else if(reg1->type == REG_STRING && reg2->type == REG_STRING) {
+        if(strncmp(reg1->value.s,reg2->value.s, strlen(reg1->value.s))) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
     return CHIDB_OK;
 }
 
@@ -258,7 +324,26 @@ int chidb_dbm_op_Ne (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Lt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
 
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    if(reg1->type == REG_INT32 && reg2->type == REG_INT32) {
+        if(reg1->value.i > reg2->value.i) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
+    else if(reg1->type == REG_STRING && reg2->type == REG_STRING) {
+        if(strncmp(reg1->value.s,reg2->value.s, strlen(reg1->value.s)) > 0) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
     return CHIDB_OK;
 }
 
@@ -266,7 +351,26 @@ int chidb_dbm_op_Lt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Le (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
 
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    if(reg1->type == REG_INT32 && reg2->type == REG_INT32) {
+        if(reg1->value.i >= reg2->value.i) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
+    else if(reg1->type == REG_STRING && reg2->type == REG_STRING) {
+        if(strncmp(reg1->value.s,reg2->value.s, strlen(reg1->value.s)) >= 0) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
     return CHIDB_OK;
 }
 
@@ -274,7 +378,26 @@ int chidb_dbm_op_Le (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Gt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
 
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    if(reg1->type == REG_INT32 && reg2->type == REG_INT32) {
+        if(reg1->value.i < reg2->value.i) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
+    else if(reg1->type == REG_STRING && reg2->type == REG_STRING) {
+        if(strncmp(reg1->value.s,reg2->value.s, strlen(reg1->value.s)) < 0) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
     return CHIDB_OK;
 }
 
@@ -282,7 +405,26 @@ int chidb_dbm_op_Gt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Ge (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
 
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    if(reg1->type == REG_INT32 && reg2->type == REG_INT32) {
+        if(reg1->value.i <= reg2->value.i) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
+    else if(reg1->type == REG_STRING && reg2->type == REG_STRING) {
+        if(strncmp(reg1->value.s,reg2->value.s, strlen(reg1->value.s)) <= 0) {
+            stmt->pc = (uint32_t)op->p2;
+        }
+    }
     return CHIDB_OK;
 }
 
@@ -408,6 +550,6 @@ int chidb_dbm_op_Halt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
 
-    return CHIDB_OK;
+    return CHIDB_DONE;
 }
 

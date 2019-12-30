@@ -61,6 +61,7 @@
 #define CHIDB_EEMPTY (9)
 #define CHIDB_EPARSE (10)
 
+#define CHIDB_EVALIDEARG (11)
 
 #define DEFAULT_PAGE_SIZE (1024)
 
