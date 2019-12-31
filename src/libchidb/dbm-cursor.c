@@ -44,27 +44,136 @@
 
 int chidb_dbm_cursor_init(Btree *bt, chidb_dbm_cursor_t *cursor, npage_t root_page, chidb_dbm_cursor_type_t type)
 {
+    int rt;
+    chidb_dbm_trail_t *trail;
+
+    if(rt = chidb_dbm_trail_new(bt, &trail, root_page)) { return rt; }
+
+    list_init(&(cursor->trail_list));
+
+    cursor->bt = bt;
+    cursor->root_page = root_page;
+    cursor->type = type;
+    list_append(&(cursor->trail_list), trail);
+
     return CHIDB_OK;
 }
 
 int chidb_dbm_cursor_destory(chidb_dbm_cursor_t *cursor)
 {
+    chidb_dbm_trail_t *trail;
+
+    while(!list_empty(&(cursor->trail_list)))
+    {
+        trail = (chidb_dbm_trail_t *)list_fetch(&(cursor->trail_list));
+        chidb_dbm_trail_destory(cursor, trail);
+    }
+
+    list_destroy(&(cursor->trail_list));
+
     return CHIDB_OK;
 }
 
 int chidb_dbm_trail_new(Btree *bt, chidb_dbm_trail_t **trail, npage_t npage)
 {
+    int rt;
+    BTreeNode *btn;
+
+    (*trail) = malloc(sizeof(chidb_dbm_trail_t));
+    if((*trail) == NULL) {
+        return CHIDB_ENOMEM;
+    }
+
+    if(rt = chidb_Btree_getNodeByPage(bt, npage, &btn)) { return rt; }
+
+    (*trail)->btn = btn;
+    (*trail)->n_cur_cell = 0;
+    (*trail)->depth = 0;
+
     return CHIDB_OK;
 }
 
 int chidb_dbm_trail_destory(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail)
 {
+    int rt;
+    if(rt = chidb_Btree_freeMemNode(cursor->bt, trail->btn)) { return rt; }
+    free(trail);
     return CHIDB_OK;
+}
+
+int chidb_dbm_cursor_table_rewind(chidb_dbm_cursor_t *cursor)
+{
+    int rt;
+    uint32_t trail_loc = list_size(&(cursor->trail_list)) - 1;
+    if(trail_loc < 0) {
+        return CHIDB_EEMPTY;
+    }
+
+    chidb_dbm_trail_t *trail = list_get_at(&(cursor->trail_list), trail_loc);
+
+    if(trail->btn->type == PGTYPE_TABLE_INTERNAL) {
+        BTreeCell cell;
+        trail->n_cur_cell = 0;
+        if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
+        chidb_dbm_trail_t *new_trail;
+        chidb_dbm_trail_new(cursor->bt, &new_trail, cell.fields.tableInternal.child_page);
+        new_trail->depth = trail->depth + 1;
+        list_append(&(cursor->trail_list), new_trail);
+        return chidb_dbm_cursor_table_rewind(cursor);
+    }
+    else {
+        trail->n_cur_cell = 0;
+        if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &(cursor->cur_cell))) { return rt; }
+        return CHIDB_OK;
+    }
+}
+
+int chidb_dbm_cursor_index_rewind(chidb_dbm_cursor_t *cursor)
+{
+    int rt;
+    uint32_t trail_loc = list_size(&(cursor->trail_list)) - 1;
+    if(trail_loc < 0) {
+        return CHIDB_EEMPTY;
+    }
+
+    chidb_dbm_trail_t *trail = list_get_at(&(cursor->trail_list), trail_loc);
+
+    if(trail->btn->type == PGTYPE_INDEX_INTERNAL) {
+        BTreeCell cell;
+        trail->n_cur_cell = 0;
+        if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
+        chidb_dbm_trail_t *new_trail;
+        chidb_dbm_trail_new(cursor->bt, &new_trail, cell.fields.indexInternal.child_page);
+        new_trail->depth = trail->depth + 1;
+        list_append(&(cursor->trail_list), new_trail);
+        return chidb_dbm_cursor_index_rewind(cursor);
+    }
+    else {
+        trail->n_cur_cell = 0;
+        if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &(cursor->cur_cell))) { return rt; }
+        return CHIDB_OK;
+    }
 }
 
 int chidb_dbm_cursor_rewind(chidb_dbm_cursor_t *cursor)
 {
-    return CHIDB_OK;
+    chidb_dbm_trail_t *tmp_trail;
+    while(!list_empty(&(cursor->trail_list)))
+    {
+        tmp_trail = (chidb_dbm_trail_t *)list_fetch(&(cursor->trail_list));
+        chidb_dbm_trail_destory(cursor, tmp_trail);
+    }
+
+    chidb_dbm_trail_new(cursor->bt, &tmp_trail, cursor->root_page);
+    list_append(&(cursor->trail_list), tmp_trail);
+
+    if(tmp_trail->btn->type == PGTYPE_TABLE_INTERNAL ||
+        tmp_trail->btn->type == PGTYPE_TABLE_LEAF) {
+        return chidb_dbm_cursor_table_rewind(cursor);
+    }
+    else {
+        return chidb_dbm_cursor_index_rewind(cursor);
+    }
 }
 
 int chidb_dbm_cursor_next(chidb_dbm_cursor_t *cursor)
