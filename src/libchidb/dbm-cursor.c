@@ -42,3 +42,42 @@
 
 /* Your code goes here */
 
+int chidb_dbm_cursor_init(Btree *bt, chidb_dbm_cursor_t *cursor, npage_t root_page, chidb_dbm_cursor_type_t type)
+{
+    return CHIDB_OK;
+}
+
+int chidb_dbm_cursor_destory(chidb_dbm_cursor_t *cursor)
+{
+    return CHIDB_OK;
+}
+
+int chidb_dbm_trail_new(Btree *bt, chidb_dbm_trail_t **trail, npage_t npage)
+{
+    return CHIDB_OK;
+}
+
+int chidb_dbm_trail_destory(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail)
+{
+    return CHIDB_OK;
+}
+
+int chidb_dbm_cursor_rewind(chidb_dbm_cursor_t *cursor)
+{
+    return CHIDB_OK;
+}
+
+int chidb_dbm_cursor_next(chidb_dbm_cursor_t *cursor)
+{
+    return CHIDB_OK;
+}
+
+int chidb_dbm_cursor_prev(chidb_dbm_cursor_t *cursor)
+{
+    return CHIDB_OK;
+}
+
+int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_dbm_seek_type_t seek_type)
+{
+    return CHIDB_OK;
+}
