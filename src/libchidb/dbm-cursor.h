@@ -90,6 +90,6 @@ int chidb_dbm_trail_destory(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail
 int chidb_dbm_cursor_rewind(chidb_dbm_cursor_t *cursor);
 int chidb_dbm_cursor_next(chidb_dbm_cursor_t *cursor);
 int chidb_dbm_cursor_prev(chidb_dbm_cursor_t *cursor);
-int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_dbm_seek_type_t seek_type);
+int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_key_t key, chidb_dbm_seek_type_t seek_type);
 
 #endif /* DBM_CURSOR_H_ */

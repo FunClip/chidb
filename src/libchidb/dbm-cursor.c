@@ -287,7 +287,7 @@ int chidb_dbm_cursor_prev(chidb_dbm_cursor_t *cursor)
     return CHIDB_OK;
 }
 
-int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_dbm_seek_type_t seek_type)
+int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_key_t key, chidb_dbm_seek_type_t seek_type)
 {
     return CHIDB_OK;
 }
