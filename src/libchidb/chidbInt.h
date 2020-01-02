@@ -60,6 +60,7 @@
 #define CHIDB_EDUPLICATE (8)
 #define CHIDB_EEMPTY (9)
 #define CHIDB_EPARSE (10)
+#define CHIDB_EMOVE (-1)
 
 #define CHIDB_EVALIDEARG (11)
 
