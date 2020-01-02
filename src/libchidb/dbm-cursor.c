@@ -170,7 +170,7 @@ int chidb_dbm_trail_layer_next(chidb_dbm_cursor_t *cursor, int layer)
     }
     else {
         npage_t child_page;
-        trail->n_cur_cell ++;
+        trail->n_cur_cell++;
         if(trail->n_cur_cell < trail->btn->n_cells) {
             BTreeCell cell;
             if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
@@ -188,6 +188,40 @@ int chidb_dbm_trail_layer_next(chidb_dbm_cursor_t *cursor, int layer)
         chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
         new_trail->depth = trail->depth + 1;
         new_trail->n_cur_cell = 0;
+        list_insert_at(&(cursor->trail_list), new_trail, trail_loc + 1);
+        return CHIDB_OK;
+    }
+}
+
+int chidb_dbm_trail_layer_prev(chidb_dbm_cursor_t *cursor, int layer)
+{
+    uint32_t trail_loc = list_size(&(cursor->trail_list)) + layer;
+    chidb_dbm_trail_t *trail = list_get_at(&(cursor->trail_list), trail_loc);
+    int rt;
+
+    if(trail->n_cur_cell == 0) {
+        if(trail_loc == 0) {
+            return CHIDB_EMOVE;
+        }
+        if(rt = chidb_dbm_trail_layer_prev(cursor, layer - 1)) { return rt; }
+        return CHIDB_OK;
+    }
+    else {
+        npage_t child_page;
+        trail->n_cur_cell--;
+
+        BTreeCell cell;
+        if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
+        child_page = trail->btn->type == PGTYPE_INDEX_INTERNAL ? cell.fields.indexInternal.child_page 
+                                                                : cell.fields.tableInternal.child_page;
+
+        chidb_dbm_trail_t *new_trail;
+        new_trail = list_extract_at(&(cursor->trail_list), trail_loc + 1);
+        chidb_dbm_trail_destory(cursor, new_trail);
+        
+        chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
+        new_trail->depth = trail->depth + 1;
+        new_trail->n_cur_cell = new_trail->btn->n_cells;
         list_insert_at(&(cursor->trail_list), new_trail, trail_loc + 1);
         return CHIDB_OK;
     }
@@ -235,6 +269,21 @@ int chidb_dbm_cursor_next(chidb_dbm_cursor_t *cursor)
 
 int chidb_dbm_cursor_prev(chidb_dbm_cursor_t *cursor)
 {
+    uint32_t trail_loc = list_size(&(cursor->trail_list)) - 1;
+    chidb_dbm_trail_t *trail = list_get_at(&(cursor->trail_list), trail_loc);
+    int rt = 0;
+    if(trail->n_cur_cell == 0) {
+        if(rt = chidb_dbm_trail_layer_prev(cursor, -2)) {
+            return rt;
+        }
+        trail = list_get_at(&(cursor->trail_list), trail_loc);
+        trail->n_cur_cell--;
+    }
+    else {
+        trail->n_cur_cell--;
+    }
+
+    if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &(cursor->cur_cell))) { return rt; }
     return CHIDB_OK;
 }
 
