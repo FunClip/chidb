@@ -166,31 +166,31 @@ int chidb_dbm_trail_layer_next(chidb_dbm_cursor_t *cursor, int layer)
             return CHIDB_EMOVE;
         }
         if(rt = chidb_dbm_trail_layer_next(cursor, layer - 1)) { return rt; }
-        return CHIDB_OK;
+        trail = list_get_at(&(cursor->trail_list), trail_loc);
     }
     else {
-        npage_t child_page;
         trail->n_cur_cell++;
-        if(trail->n_cur_cell < trail->btn->n_cells) {
-            BTreeCell cell;
-            if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
-            child_page = trail->btn->type == PGTYPE_INDEX_INTERNAL ? cell.fields.indexInternal.child_page 
-                                                                    : cell.fields.tableInternal.child_page;
-        }
-        else {
-            child_page = trail->btn->right_page;
-        }
-
-        chidb_dbm_trail_t *new_trail;
-        new_trail = list_extract_at(&(cursor->trail_list), trail_loc + 1);
-        chidb_dbm_trail_destroy(cursor, new_trail);
-        
-        chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
-        new_trail->depth = trail->depth + 1;
-        new_trail->n_cur_cell = 0;
-        list_insert_at(&(cursor->trail_list), new_trail, trail_loc + 1);
-        return CHIDB_OK;
     }
+    npage_t child_page;
+    if(trail->n_cur_cell < trail->btn->n_cells) {
+        BTreeCell cell;
+        if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
+        child_page = trail->btn->type == PGTYPE_INDEX_INTERNAL ? cell.fields.indexInternal.child_page 
+                                                                : cell.fields.tableInternal.child_page;
+    }
+    else {
+        child_page = trail->btn->right_page;
+    }
+
+    chidb_dbm_trail_t *new_trail;
+    new_trail = list_extract_at(&(cursor->trail_list), trail_loc + 1);
+    chidb_dbm_trail_destroy(cursor, new_trail);
+    
+    chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
+    new_trail->depth = trail->depth + 1;
+    new_trail->n_cur_cell = 0;
+    list_insert_at(&(cursor->trail_list), new_trail, trail_loc + 1);
+    return CHIDB_OK;
 }
 
 int chidb_dbm_trail_layer_prev(chidb_dbm_cursor_t *cursor, int layer)
@@ -204,27 +204,32 @@ int chidb_dbm_trail_layer_prev(chidb_dbm_cursor_t *cursor, int layer)
             return CHIDB_EMOVE;
         }
         if(rt = chidb_dbm_trail_layer_prev(cursor, layer - 1)) { return rt; }
-        return CHIDB_OK;
+        trail = list_get_at(&(cursor->trail_list), trail_loc);
     }
     else {
-        npage_t child_page;
         trail->n_cur_cell--;
+    }
+    npage_t child_page;
 
-        BTreeCell cell;
+    BTreeCell cell;
+    if(trail->n_cur_cell == trail->btn->n_cells) {
+        child_page = trail->btn->right_page;
+    }
+    else {
         if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
         child_page = trail->btn->type == PGTYPE_INDEX_INTERNAL ? cell.fields.indexInternal.child_page 
                                                                 : cell.fields.tableInternal.child_page;
-
-        chidb_dbm_trail_t *new_trail;
-        new_trail = list_extract_at(&(cursor->trail_list), trail_loc + 1);
-        chidb_dbm_trail_destroy(cursor, new_trail);
-        
-        chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
-        new_trail->depth = trail->depth + 1;
-        new_trail->n_cur_cell = new_trail->btn->n_cells;
-        list_insert_at(&(cursor->trail_list), new_trail, trail_loc + 1);
-        return CHIDB_OK;
     }
+
+    chidb_dbm_trail_t *new_trail;
+    new_trail = list_extract_at(&(cursor->trail_list), trail_loc + 1);
+    chidb_dbm_trail_destroy(cursor, new_trail);
+    
+    chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
+    new_trail->depth = trail->depth + 1;
+    new_trail->n_cur_cell = new_trail->btn->n_cells;
+    list_insert_at(&(cursor->trail_list), new_trail, trail_loc + 1);
+    return CHIDB_OK;
 }
 
 int chidb_dbm_cursor_seek_helper(chidb_dbm_cursor_t *cursor, chidb_key_t key)

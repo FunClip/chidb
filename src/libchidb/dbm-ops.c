@@ -379,9 +379,6 @@ int chidb_dbm_op_Column (chidb_stmt *stmt, chidb_dbm_op_t *op)
     /* Your code goes here */
     if (!IS_VALID_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p3)) {
-        return CHIDB_EVALIDEARG;
-    }
     
     int8_t byte;
     int16_t smallint;
@@ -438,9 +435,7 @@ int chidb_dbm_op_Key (chidb_stmt *stmt, chidb_dbm_op_t *op)
     /* Your code goes here */
     if (!IS_VALID_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p2)) {
-        return CHIDB_EVALIDEARG;
-    }
+
     int rt;
     chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
 
