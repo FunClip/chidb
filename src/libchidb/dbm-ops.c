@@ -83,7 +83,7 @@ int realloc_reg(chidb_stmt *stmt, uint32_t size);
 int chidb_dbm_op_WriteReg(chidb_stmt *stmt, int regNo, int reg_type, void *data)
 {
     int rt;
-    if (IS_VALID_REGISTER(stmt, regNo) && regNo > stmt->nReg)
+    if(IS_VALID_REGISTER(stmt, regNo) && regNo > stmt->nReg)
         if(rt = realloc_reg(stmt, regNo)) {
             return rt;
         }
@@ -91,9 +91,9 @@ int chidb_dbm_op_WriteReg(chidb_stmt *stmt, int regNo, int reg_type, void *data)
     chidb_dbm_register_t *reg = &(stmt->reg[regNo]);
     reg->type = reg_type;
 
-    if (reg_type == REG_INT32)
+    if(reg_type == REG_INT32)
         reg->value.i = *((int32_t *) data);
-    else if (reg_type == REG_STRING)
+    else if(reg_type == REG_STRING)
         reg->value.s = (char *) data;
 
     return CHIDB_OK;
@@ -111,7 +111,7 @@ int chidb_dbm_op_Noop (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_OpenRead (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!EXISTS_CURSOR(stmt, op->p1))
+    if(!EXISTS_CURSOR(stmt, op->p1))
         realloc_cur(stmt, op->p1);
 
     chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
@@ -121,7 +121,7 @@ int chidb_dbm_op_OpenRead (chidb_stmt *stmt, chidb_dbm_op_t *op)
     c->type = CURSOR_READ;
 
     // check that the op worked properly
-    if (!IS_VALID_CURSOR(stmt, op->p1))
+    if(!IS_VALID_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
     return CHIDB_OK;
 }
@@ -130,7 +130,7 @@ int chidb_dbm_op_OpenRead (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_OpenWrite (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!EXISTS_CURSOR(stmt, op->p1))
+    if(!EXISTS_CURSOR(stmt, op->p1))
         realloc_cur(stmt, op->p1);
 
     chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
@@ -140,7 +140,7 @@ int chidb_dbm_op_OpenWrite (chidb_stmt *stmt, chidb_dbm_op_t *op)
     c->type = CURSOR_WRITE;
 
     // check that the op worked properly
-    if (!IS_VALID_CURSOR(stmt, op->p1))
+    if(!IS_VALID_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
     return CHIDB_OK;
 }
@@ -149,7 +149,7 @@ int chidb_dbm_op_OpenWrite (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Close (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!EXISTS_CURSOR(stmt, op->p1))
+    if(!EXISTS_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
@@ -164,9 +164,9 @@ int chidb_dbm_op_Rewind (chidb_stmt *stmt, chidb_dbm_op_t *op)
     /* Your code goes here */
     uint32_t jmp_addr = op->p2;
 
-    if (!EXISTS_CURSOR(stmt, op->p1))
+    if(!EXISTS_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, jmp_addr))
+    if(!IS_VALID_ADDRESS(stmt, jmp_addr))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
@@ -189,9 +189,9 @@ int chidb_dbm_op_Next (chidb_stmt *stmt, chidb_dbm_op_t *op)
     uint32_t jmp_addr = op->p2;
     int rt;
 
-    if (!EXISTS_CURSOR(stmt, op->p1))
+    if(!EXISTS_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_cursor_t *c = &((stmt)->cursors[c_index]);
@@ -213,9 +213,9 @@ int chidb_dbm_op_Prev (chidb_stmt *stmt, chidb_dbm_op_t *op)
     uint32_t jmp_addr = op->p2;
     int rt;
 
-    if (!EXISTS_CURSOR(stmt, op->p1))
+    if(!EXISTS_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_cursor_t *c = &((stmt)->cursors[c_index]);
@@ -233,13 +233,13 @@ int chidb_dbm_op_Prev (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Seek (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+    if(!IS_VALID_REGISTER(stmt, op->p3)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+    if(!IS_VALID_CURSOR(stmt, op->p1)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+    if(!IS_VALID_ADDRESS(stmt, op->p2)) {
         return CHIDB_EVALIDEARG;
     }
 
@@ -263,13 +263,13 @@ int chidb_dbm_op_Seek (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_SeekGt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+    if(!IS_VALID_REGISTER(stmt, op->p3)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+    if(!IS_VALID_CURSOR(stmt, op->p1)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+    if(!IS_VALID_ADDRESS(stmt, op->p2)) {
         return CHIDB_EVALIDEARG;
     }
 
@@ -292,13 +292,13 @@ int chidb_dbm_op_SeekGt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_SeekGe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+    if(!IS_VALID_REGISTER(stmt, op->p3)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+    if(!IS_VALID_CURSOR(stmt, op->p1)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+    if(!IS_VALID_ADDRESS(stmt, op->p2)) {
         return CHIDB_EVALIDEARG;
     }
 
@@ -320,13 +320,13 @@ int chidb_dbm_op_SeekGe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_SeekLt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+    if(!IS_VALID_REGISTER(stmt, op->p3)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+    if(!IS_VALID_CURSOR(stmt, op->p1)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+    if(!IS_VALID_ADDRESS(stmt, op->p2)) {
         return CHIDB_EVALIDEARG;
     }
 
@@ -349,13 +349,13 @@ int chidb_dbm_op_SeekLt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_SeekLe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+    if(!IS_VALID_REGISTER(stmt, op->p3)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+    if(!IS_VALID_CURSOR(stmt, op->p1)) {
         return CHIDB_EVALIDEARG;
     }
-    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+    if(!IS_VALID_ADDRESS(stmt, op->p2)) {
         return CHIDB_EVALIDEARG;
     }
 
@@ -377,7 +377,7 @@ int chidb_dbm_op_SeekLe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Column (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_CURSOR(stmt, op->p1))
+    if(!IS_VALID_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
     
     int8_t byte;
@@ -404,21 +404,21 @@ int chidb_dbm_op_Column (chidb_stmt *stmt, chidb_dbm_op_t *op)
             break;
         case SQL_INTEGER_2BYTE:
             rt = chidb_DBRecord_getInt16(dbr, (uint8_t)op->p2, &smallint);
-            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_INT32, &smallint) != CHIDB_OK)
+            if(chidb_dbm_op_WriteReg(stmt, op->p3, REG_INT32, &smallint) != CHIDB_OK)
                 return rt;
             break;
         case SQL_INTEGER_4BYTE:
             rt = chidb_DBRecord_getInt32(dbr,(uint8_t)op->p2, &integer);
-            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_INT32, &integer) != CHIDB_OK)
+            if(chidb_dbm_op_WriteReg(stmt, op->p3, REG_INT32, &integer) != CHIDB_OK)
                 return rt;
             break;
         case SQL_NULL:
-            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_NULL, NULL) != CHIDB_OK)
+            if(chidb_dbm_op_WriteReg(stmt, op->p3, REG_NULL, NULL) != CHIDB_OK)
                 return rt;
             break;
         case SQL_TEXT:
             rt = chidb_DBRecord_getString(dbr, (uint8_t)op->p2, &string);
-            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_STRING, strdup(string)) != CHIDB_OK)
+            if(chidb_dbm_op_WriteReg(stmt, op->p3, REG_STRING, strdup(string)) != CHIDB_OK)
                 return rt;
             break;
         case SQL_NOTVALID:
@@ -433,7 +433,7 @@ int chidb_dbm_op_Column (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Key (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_CURSOR(stmt, op->p1))
+    if(!IS_VALID_CURSOR(stmt, op->p1))
         return CHIDB_EVALIDEARG;
 
     int rt;
@@ -483,9 +483,9 @@ int chidb_dbm_op_Null (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_ResultRow (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p1))
+    if(!IS_VALID_REGISTER(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p2))
+    if(!IS_VALID_REGISTER(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     stmt->startRR = (uint32_t)op->p1;
@@ -497,6 +497,42 @@ int chidb_dbm_op_ResultRow (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_MakeRecord (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    int rt;
+    int32_t nr1 = op->p1;
+    int32_t n = op->p2;
+    int32_t nr2 = op->p3;
+    int32_t nEndReg = (nr1+n);
+    DBRecord *dbr;
+    uint8_t *data;
+
+    chidb_dbm_register_t *r2 = &((stmt)->reg[nr2]);
+
+    DBRecordBuffer dbrb;
+    chidb_DBRecord_create_empty(&dbrb, (uint8_t)n);
+
+    for(int i = nr1; i < nEndReg; i++) {
+        if(!IS_VALID_REGISTER(stmt, i))
+            return CHIDB_EVALIDEARG;
+        chidb_dbm_register_t *tmp = &((stmt)->reg[i]);
+
+        if(tmp->type == REG_NULL)
+            chidb_DBRecord_appendNull(&dbrb);
+        else if(tmp->type == REG_INT32)
+            chidb_DBRecord_appendInt32(&dbrb, tmp->value.i);
+        else if(tmp->type == REG_STRING)
+            chidb_DBRecord_appendString(&dbrb, tmp->value.s);
+    }
+
+    chidb_DBRecord_finalize(&dbrb, &dbr);
+    uint32_t len = dbr->packed_len;
+    chidb_DBRecord_pack(dbr, &data);
+    chidb_DBRecord_destroy(dbr);
+
+    if(rt = chidb_dbm_op_WriteReg(stmt, nr2, REG_BINARY, NULL))
+        return rt;
+    r2->type = REG_BINARY;
+    r2->value.bin.nbytes = len;
+    r2->value.bin.bytes = data;
 
     return CHIDB_OK;
 }
@@ -505,6 +541,25 @@ int chidb_dbm_op_MakeRecord (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Insert (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p2]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    BTreeCell cell;
+    cell.type = PGTYPE_TABLE_LEAF;
+    cell.key = (uint32_t)reg2->value.i;
+    cell.fields.tableLeaf.data = reg1->value.bin.bytes;
+    cell.fields.tableLeaf.data_size = reg1->value.bin.nbytes;
+
+    chidb_Btree_insert(stmt->db->bt, c->root_page, &cell);
+
+    chidb_key_t cur_key = c->cur_cell.key;
+    chidb_dbm_cursor_seek(c, cur_key, SEEKEQ);
 
     return CHIDB_OK;
 }
@@ -513,11 +568,11 @@ int chidb_dbm_op_Insert (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Eq (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p1))
+    if(!IS_VALID_REGISTER(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p3))
+    if(!IS_VALID_REGISTER(stmt, op->p3))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
@@ -540,11 +595,11 @@ int chidb_dbm_op_Eq (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Ne (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p1))
+    if(!IS_VALID_REGISTER(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p3))
+    if(!IS_VALID_REGISTER(stmt, op->p3))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
@@ -567,11 +622,11 @@ int chidb_dbm_op_Ne (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Lt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p1))
+    if(!IS_VALID_REGISTER(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p3))
+    if(!IS_VALID_REGISTER(stmt, op->p3))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
@@ -594,11 +649,11 @@ int chidb_dbm_op_Lt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Le (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p1))
+    if(!IS_VALID_REGISTER(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p3))
+    if(!IS_VALID_REGISTER(stmt, op->p3))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
@@ -621,11 +676,11 @@ int chidb_dbm_op_Le (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Gt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p1))
+    if(!IS_VALID_REGISTER(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p3))
+    if(!IS_VALID_REGISTER(stmt, op->p3))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
@@ -648,11 +703,11 @@ int chidb_dbm_op_Gt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Ge (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
-    if (!IS_VALID_REGISTER(stmt, op->p1))
+    if(!IS_VALID_REGISTER(stmt, op->p1))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_REGISTER(stmt, op->p3))
+    if(!IS_VALID_REGISTER(stmt, op->p3))
         return CHIDB_EVALIDEARG;
-    if (!IS_VALID_ADDRESS(stmt, op->p2))
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
         return CHIDB_EVALIDEARG;
 
     chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p1]);
@@ -678,12 +733,26 @@ int chidb_dbm_op_Ge (chidb_stmt *stmt, chidb_dbm_op_t *op)
  * p2: jump addr
  * p3: register containing value k
  * 
- * if (idxkey at cursor p1) > k, jump
+ * if(idxkey at cursor p1) > k, jump
  */
 int chidb_dbm_op_IdxGt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
-  fprintf(stderr,"todo: chidb_dbm_op_IdxGt\n");
-  exit(1);
+    if(!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    int32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    if(c->cur_cell.key > key) {
+        stmt->pc = (uint32_t)op->p2;
+    }
+
+    return CHIDB_OK;
 }
 
 /* IdxGe p1 p2 p3 *
@@ -692,12 +761,26 @@ int chidb_dbm_op_IdxGt (chidb_stmt *stmt, chidb_dbm_op_t *op)
  * p2: jump addr
  * p3: register containing value k
  * 
- * if (idxkey at cursor p1) >= k, jump
+ * if(idxkey at cursor p1) >= k, jump
  */
 int chidb_dbm_op_IdxGe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
-  fprintf(stderr,"todo: chidb_dbm_op_IdxGe\n");
-  exit(1);
+    if(!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    int32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    if(c->cur_cell.key >= key) {
+        stmt->pc = (uint32_t)op->p2;
+    }
+
+    return CHIDB_OK;
 }
 
 /* IdxLt p1 p2 p3 *
@@ -706,12 +789,26 @@ int chidb_dbm_op_IdxGe (chidb_stmt *stmt, chidb_dbm_op_t *op)
  * p2: jump addr
  * p3: register containing value k
  * 
- * if (idxkey at cursor p1) < k, jump
+ * if(idxkey at cursor p1) < k, jump
  */
 int chidb_dbm_op_IdxLt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
-  fprintf(stderr,"todo: chidb_dbm_op_IdxLt\n");
-  exit(1);
+    if(!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    int32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    if(c->cur_cell.key < key) {
+        stmt->pc = (uint32_t)op->p2;
+    }
+
+    return CHIDB_OK;
 }
 
 /* IdxLe p1 p2 p3 *
@@ -720,12 +817,26 @@ int chidb_dbm_op_IdxLt (chidb_stmt *stmt, chidb_dbm_op_t *op)
  * p2: jump addr
  * p3: register containing value k
  * 
- * if (idxkey at cursor p1) <= k, jump
+ * if(idxkey at cursor p1) <= k, jump
  */
 int chidb_dbm_op_IdxLe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
-  fprintf(stderr,"todo: chidb_dbm_op_IdxLe\n");
-  exit(1);
+    if(!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if(!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    int32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    if(c->cur_cell.key <= key) {
+        stmt->pc = (uint32_t)op->p2;
+    }
+
+    return CHIDB_OK;
 }
 
 
@@ -738,8 +849,26 @@ int chidb_dbm_op_IdxLe (chidb_stmt *stmt, chidb_dbm_op_t *op)
  */
 int chidb_dbm_op_IdxPKey (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
-  fprintf(stderr,"todo: chidb_dbm_op_IdxKey\n");
-  exit(1);
+    if(!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    uint32_t key;
+
+    if(c->cur_cell.type == PGTYPE_INDEX_INTERNAL) {
+        key = c->cur_cell.fields.indexInternal.keyPk;
+    }
+    else {
+        key = c->cur_cell.fields.indexLeaf.keyPk;
+    }
+
+    int rt;
+    if(rt = chidb_dbm_op_WriteReg(stmt, op->p2, REG_INT32, &key)) {
+        return rt;
+    }
+
+    return CHIDB_OK;
 }
 
 /* IdxInsert p1 p2 p3 *
@@ -752,14 +881,40 @@ int chidb_dbm_op_IdxPKey (chidb_stmt *stmt, chidb_dbm_op_t *op)
  */
 int chidb_dbm_op_IdxInsert (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
-  fprintf(stderr,"todo: chidb_dbm_op_IdxInsert\n");
-  exit(1);
+    if (!IS_VALID_REGISTER(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3))
+        return CHIDB_EVALIDEARG;
+    chidb_dbm_register_t *reg1 = &((stmt)->reg[op->p2]);
+    chidb_dbm_register_t *reg2 = &((stmt)->reg[op->p3]);
+
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    BTreeCell cell;
+    cell.type = PGTYPE_INDEX_LEAF;
+    cell.key = (uint32_t)reg2->value.i;
+    cell.fields.indexLeaf.keyPk = (uint32_t)reg2->value.i;
+
+    chidb_Btree_insert(stmt->db->bt, c->root_page, &cell);
+
+    chidb_key_t cur_key = c->cur_cell.key;
+    chidb_dbm_cursor_seek(c, cur_key, SEEKEQ);
+
+    return CHIDB_OK;
 }
 
 
 int chidb_dbm_op_CreateTable (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    npage_t root;
+
+    int rt = chidb_Btree_newNode(stmt->db->bt, &root, PGTYPE_TABLE_LEAF);
+    if(rt)
+        return rt;
+
+    if(rt = chidb_dbm_op_WriteReg(stmt, op->p1, REG_INT32, &root))
+        return rt;
 
     return CHIDB_OK;
 }
@@ -768,6 +923,14 @@ int chidb_dbm_op_CreateTable (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_CreateIndex (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    npage_t root;
+
+    int rt = chidb_Btree_newNode(stmt->db->bt, &root, PGTYPE_INDEX_LEAF);
+    if(rt)
+        return rt;
+
+    if(rt = chidb_dbm_op_WriteReg(stmt, op->p1, REG_INT32, &root))
+        return rt;
 
     return CHIDB_OK;
 }
