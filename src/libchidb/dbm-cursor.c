@@ -42,7 +42,7 @@
 
 /* Your code goes here */
 
-int chidb_dbm_cursor_init(Btree *bt, chidb_dbm_cursor_t *cursor, npage_t root_page, chidb_dbm_cursor_type_t type)
+int chidb_dbm_cursor_init(Btree *bt, chidb_dbm_cursor_t *cursor, npage_t root_page, uint32_t n_cols)
 {
     int rt;
     chidb_dbm_trail_t *trail;
@@ -53,20 +53,20 @@ int chidb_dbm_cursor_init(Btree *bt, chidb_dbm_cursor_t *cursor, npage_t root_pa
 
     cursor->bt = bt;
     cursor->root_page = root_page;
-    cursor->type = type;
+    cursor->n_cols = n_cols;
     list_append(&(cursor->trail_list), trail);
 
     return CHIDB_OK;
 }
 
-int chidb_dbm_cursor_destory(chidb_dbm_cursor_t *cursor)
+int chidb_dbm_cursor_destroy(chidb_dbm_cursor_t *cursor)
 {
     chidb_dbm_trail_t *trail;
 
     while(!list_empty(&(cursor->trail_list)))
     {
         trail = (chidb_dbm_trail_t *)list_fetch(&(cursor->trail_list));
-        chidb_dbm_trail_destory(cursor, trail);
+        chidb_dbm_trail_destroy(cursor, trail);
     }
 
     list_destroy(&(cursor->trail_list));
@@ -93,7 +93,7 @@ int chidb_dbm_trail_new(Btree *bt, chidb_dbm_trail_t **trail, npage_t npage)
     return CHIDB_OK;
 }
 
-int chidb_dbm_trail_destory(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail)
+int chidb_dbm_trail_destroy(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail)
 {
     int rt;
     if(rt = chidb_Btree_freeMemNode(cursor->bt, trail->btn)) { return rt; }
@@ -183,7 +183,7 @@ int chidb_dbm_trail_layer_next(chidb_dbm_cursor_t *cursor, int layer)
 
         chidb_dbm_trail_t *new_trail;
         new_trail = list_extract_at(&(cursor->trail_list), trail_loc + 1);
-        chidb_dbm_trail_destory(cursor, new_trail);
+        chidb_dbm_trail_destroy(cursor, new_trail);
         
         chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
         new_trail->depth = trail->depth + 1;
@@ -217,7 +217,7 @@ int chidb_dbm_trail_layer_prev(chidb_dbm_cursor_t *cursor, int layer)
 
         chidb_dbm_trail_t *new_trail;
         new_trail = list_extract_at(&(cursor->trail_list), trail_loc + 1);
-        chidb_dbm_trail_destory(cursor, new_trail);
+        chidb_dbm_trail_destroy(cursor, new_trail);
         
         chidb_dbm_trail_new(cursor->bt, &new_trail, child_page);
         new_trail->depth = trail->depth + 1;
@@ -277,11 +277,14 @@ int chidb_dbm_cursor_rewind(chidb_dbm_cursor_t *cursor)
     while(!list_empty(&(cursor->trail_list)))
     {
         tmp_trail = (chidb_dbm_trail_t *)list_fetch(&(cursor->trail_list));
-        chidb_dbm_trail_destory(cursor, tmp_trail);
+        chidb_dbm_trail_destroy(cursor, tmp_trail);
     }
 
     chidb_dbm_trail_new(cursor->bt, &tmp_trail, cursor->root_page);
     list_append(&(cursor->trail_list), tmp_trail);
+
+    if(tmp_trail->btn->n_cells == 0)
+        return CHIDB_ENOTFOUND;
 
     if(tmp_trail->btn->type == PGTYPE_TABLE_INTERNAL ||
         tmp_trail->btn->type == PGTYPE_TABLE_LEAF) {
@@ -337,7 +340,7 @@ int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_key_t key, chidb_dbm
     while(!list_empty(&(cursor->trail_list)))
     {
         tmp_trail = (chidb_dbm_trail_t *)list_fetch(&(cursor->trail_list));
-        chidb_dbm_trail_destory(cursor, tmp_trail);
+        chidb_dbm_trail_destroy(cursor, tmp_trail);
     }
     int rt = chidb_dbm_cursor_seek_helper(cursor, key);
 

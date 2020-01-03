@@ -67,6 +67,7 @@ typedef struct chidb_dbm_cursor
     Btree *bt;
     BTreeCell cur_cell;
     npage_t root_page;
+    uint32_t n_cols;
 
 } chidb_dbm_cursor_t;
 
@@ -82,10 +83,10 @@ typedef enum chidb_dbm_seek_type
 /* Cursor function definitions go here */
 
 int chidb_dbm_cursor_init(Btree *bt, chidb_dbm_cursor_t *cursor, npage_t root_page, chidb_dbm_cursor_type_t type);
-int chidb_dbm_cursor_destory(chidb_dbm_cursor_t *cursor);
+int chidb_dbm_cursor_destroy(chidb_dbm_cursor_t *cursor);
 
 int chidb_dbm_trail_new(Btree *bt, chidb_dbm_trail_t **trail, npage_t npage);
-int chidb_dbm_trail_destory(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail);
+int chidb_dbm_trail_destroy(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail);
 
 int chidb_dbm_cursor_rewind(chidb_dbm_cursor_t *cursor);
 int chidb_dbm_cursor_next(chidb_dbm_cursor_t *cursor);

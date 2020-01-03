@@ -111,7 +111,18 @@ int chidb_dbm_op_Noop (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_OpenRead (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!EXISTS_CURSOR(stmt, op->p1))
+        realloc_cur(stmt, op->p1);
 
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+    chidb_dbm_cursor_init(stmt->db->bt, c, stmt->reg[op->p2].value.i, op->p3);
+    chidb_dbm_cursor_rewind(c);
+
+    c->type = CURSOR_READ;
+
+    // check that the op worked properly
+    if (!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
     return CHIDB_OK;
 }
 
@@ -119,7 +130,18 @@ int chidb_dbm_op_OpenRead (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_OpenWrite (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!EXISTS_CURSOR(stmt, op->p1))
+        realloc_cur(stmt, op->p1);
 
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+    chidb_dbm_cursor_init(stmt->db->bt, c, stmt->reg[op->p2].value.i, op->p3);
+    chidb_dbm_cursor_rewind(c);
+
+    c->type = CURSOR_WRITE;
+
+    // check that the op worked properly
+    if (!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
     return CHIDB_OK;
 }
 
@@ -127,6 +149,11 @@ int chidb_dbm_op_OpenWrite (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Close (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!EXISTS_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+    chidb_dbm_cursor_destroy(c);
 
     return CHIDB_OK;
 }
@@ -135,7 +162,22 @@ int chidb_dbm_op_Close (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Rewind (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    uint32_t jmp_addr = op->p2;
 
+    if (!EXISTS_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, jmp_addr))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    int rt = chidb_dbm_cursor_rewind(c);
+    if(rt == CHIDB_ENOTFOUND) {
+        stmt->pc = jmp_addr;
+    }
+    else if(rt) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -143,7 +185,26 @@ int chidb_dbm_op_Rewind (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Next (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    uint32_t c_index = op->p1;
+    uint32_t jmp_addr = op->p2;
+    int rt;
 
+    if (!EXISTS_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[c_index]);
+
+    // move the cursor forward
+    rt = chidb_dbm_cursor_next(c);
+    // if the cursor can't move and the jump op is valid, jump. else, get out!
+    if(!rt) {
+        stmt->pc = jmp_addr;
+    }
+    else {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -151,7 +212,26 @@ int chidb_dbm_op_Next (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Prev (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    uint32_t c_index = op->p1;
+    uint32_t jmp_addr = op->p2;
+    int rt;
 
+    if (!EXISTS_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_ADDRESS(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
+
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[c_index]);
+
+    // move the cursor forward
+    rt = chidb_dbm_cursor_prev(c);
+    // if the cursor can't move and the jump op is valid, jump. else, get out!
+    if(!rt) {
+        stmt->pc = jmp_addr;
+    }
+    else {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -159,6 +239,28 @@ int chidb_dbm_op_Prev (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Seek (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+        return CHIDB_EVALIDEARG;
+    }
+
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    uint32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    int rt = chidb_dbm_cursor_seek(c, key, SEEKEQ);
+
+    if(rt == CHIDB_ENOTFOUND) {
+        stmt->pc = op->p2;
+    }
+    else if(rt) {
+        return rt;
+    }
 
     return CHIDB_OK;
 }
@@ -167,7 +269,28 @@ int chidb_dbm_op_Seek (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_SeekGt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+        return CHIDB_EVALIDEARG;
+    }
 
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    uint32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    int rt = chidb_dbm_cursor_seek(c, key, SEEKGT);
+
+    if(rt == CHIDB_ENOTFOUND) {
+        stmt->pc = op->p2;
+    }
+    else if(rt) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -175,14 +298,56 @@ int chidb_dbm_op_SeekGt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_SeekGe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+        return CHIDB_EVALIDEARG;
+    }
 
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    uint32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    int rt = chidb_dbm_cursor_seek(c, key, SEEKGE);
+
+    if(rt == CHIDB_ENOTFOUND) {
+        stmt->pc = op->p2;
+    }
+    else if(rt) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
 int chidb_dbm_op_SeekLt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+        return CHIDB_EVALIDEARG;
+    }
 
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    uint32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    int rt = chidb_dbm_cursor_seek(c, key, SEEKLT);
+
+    if(rt == CHIDB_ENOTFOUND) {
+        stmt->pc = op->p2;
+    }
+    else if(rt) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
@@ -190,7 +355,28 @@ int chidb_dbm_op_SeekLt (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_SeekLe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_CURSOR(stmt, op->p1)) {
+        return CHIDB_EVALIDEARG;
+    }
+    if (!IS_VALID_ADDRESS(stmt, op->p2)) {
+        return CHIDB_EVALIDEARG;
+    }
 
+    chidb_dbm_register_t *r1 = &((stmt)->reg[op->p3]);
+    uint32_t key = r1->value.i;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    int rt = chidb_dbm_cursor_seek(c, key, SEEKLE);
+
+    if(rt == CHIDB_ENOTFOUND) {
+        stmt->pc = op->p2;
+    }
+    else if(rt) {
+        return rt;
+    }
     return CHIDB_OK;
 }
 
