@@ -377,6 +377,57 @@ int chidb_dbm_op_SeekLe (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Column (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p3)) {
+        return CHIDB_EVALIDEARG;
+    }
+    
+    int8_t byte;
+    int16_t smallint;
+    int32_t integer;
+    char *string;
+
+    int rt;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
+
+    DBRecord *dbr;
+    if(rt = chidb_DBRecord_unpack(&dbr, c->cur_cell.fields.tableLeaf.data)) {
+        return rt;
+    }
+
+    int col_type = chidb_DBRecord_getType(dbr, (uint8_t)op->p2);
+
+    switch (col_type)
+    {
+        case SQL_INTEGER_1BYTE:
+            rt = chidb_DBRecord_getInt8(dbr, (uint8_t)op->p2, &byte);
+            if(rt = chidb_dbm_op_WriteReg(stmt, op->p3, REG_INT32, &byte))
+                return rt;
+            break;
+        case SQL_INTEGER_2BYTE:
+            rt = chidb_DBRecord_getInt16(dbr, (uint8_t)op->p2, &smallint);
+            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_INT32, &smallint) != CHIDB_OK)
+                return rt;
+            break;
+        case SQL_INTEGER_4BYTE:
+            rt = chidb_DBRecord_getInt32(dbr,(uint8_t)op->p2, &integer);
+            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_INT32, &integer) != CHIDB_OK)
+                return rt;
+            break;
+        case SQL_NULL:
+            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_NULL, NULL) != CHIDB_OK)
+                return rt;
+            break;
+        case SQL_TEXT:
+            rt = chidb_DBRecord_getString(dbr, (uint8_t)op->p2, &string);
+            if (chidb_dbm_op_WriteReg(stmt, op->p3, REG_STRING, strdup(string)) != CHIDB_OK)
+                return rt;
+            break;
+        case SQL_NOTVALID:
+            (stmt)->reg[op->p3].type = REG_UNSPECIFIED;
+            break;
+    }
 
     return CHIDB_OK;
 }
@@ -385,7 +436,18 @@ int chidb_dbm_op_Column (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_Key (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_CURSOR(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p2)) {
+        return CHIDB_EVALIDEARG;
+    }
+    int rt;
+    chidb_dbm_cursor_t *c = &((stmt)->cursors[op->p1]);
 
+    if(rt = chidb_dbm_op_WriteReg(stmt, op->p2, REG_INT32, &(c->cur_cell.key))) {
+        return rt;
+    }
+    
     return CHIDB_OK;
 }
 
@@ -426,8 +488,14 @@ int chidb_dbm_op_Null (chidb_stmt *stmt, chidb_dbm_op_t *op)
 int chidb_dbm_op_ResultRow (chidb_stmt *stmt, chidb_dbm_op_t *op)
 {
     /* Your code goes here */
+    if (!IS_VALID_REGISTER(stmt, op->p1))
+        return CHIDB_EVALIDEARG;
+    if (!IS_VALID_REGISTER(stmt, op->p2))
+        return CHIDB_EVALIDEARG;
 
-    return CHIDB_OK;
+    stmt->startRR = (uint32_t)op->p1;
+    stmt->nRR = (uint32_t)op->p2;
+    return CHIDB_ROW;
 }
 
 
