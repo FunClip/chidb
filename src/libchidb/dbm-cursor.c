@@ -301,6 +301,8 @@ int chidb_dbm_cursor_next(chidb_dbm_cursor_t *cursor)
     chidb_dbm_trail_t *trail = list_get_at(&(cursor->trail_list), trail_loc);
     int rt = 0;
     if(trail->n_cur_cell == trail->btn->n_cells - 1) {
+        if(trail_loc == 0)
+            return CHIDB_EMOVE;
         if(rt = chidb_dbm_trail_layer_next(cursor, -2)) {
             return rt;
         }
@@ -320,6 +322,8 @@ int chidb_dbm_cursor_prev(chidb_dbm_cursor_t *cursor)
     chidb_dbm_trail_t *trail = list_get_at(&(cursor->trail_list), trail_loc);
     int rt = 0;
     if(trail->n_cur_cell == 0) {
+        if(trail_loc == 0)
+            return CHIDB_EMOVE;
         if(rt = chidb_dbm_trail_layer_prev(cursor, -2)) {
             return rt;
         }
@@ -342,7 +346,11 @@ int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_key_t key, chidb_dbm
         tmp_trail = (chidb_dbm_trail_t *)list_fetch(&(cursor->trail_list));
         chidb_dbm_trail_destroy(cursor, tmp_trail);
     }
-    int rt = chidb_dbm_cursor_seek_helper(cursor, key);
+    int rt;
+    if(rt = chidb_dbm_trail_new(cursor->bt, &tmp_trail, cursor->root_page)) { return rt; }
+    list_append(&(cursor->trail_list), tmp_trail);
+
+    rt = chidb_dbm_cursor_seek_helper(cursor, key);
 
     switch(seek_type){
 

@@ -202,9 +202,6 @@ int chidb_dbm_op_Next (chidb_stmt *stmt, chidb_dbm_op_t *op)
     if(!rt) {
         stmt->pc = jmp_addr;
     }
-    else {
-        return rt;
-    }
     return CHIDB_OK;
 }
 
@@ -228,9 +225,6 @@ int chidb_dbm_op_Prev (chidb_stmt *stmt, chidb_dbm_op_t *op)
     // if the cursor can't move and the jump op is valid, jump. else, get out!
     if(!rt) {
         stmt->pc = jmp_addr;
-    }
-    else {
-        return rt;
     }
     return CHIDB_OK;
 }
