@@ -227,6 +227,50 @@ int chidb_dbm_trail_layer_prev(chidb_dbm_cursor_t *cursor, int layer)
     }
 }
 
+int chidb_dbm_cursor_seek_helper(chidb_dbm_cursor_t *cursor, chidb_key_t key)
+{
+    uint32_t trail_loc = list_size(&(cursor->trail_list)) - 1;
+    chidb_dbm_trail_t *trail = list_get_at(&(cursor->trail_list), trail_loc);
+    int rt = 0;
+
+    if(trail->btn->type == PGTYPE_INDEX_LEAF || trail->btn->type == PGTYPE_TABLE_LEAF) {
+        for(; trail->n_cur_cell < trail->btn->n_cells; trail->n_cur_cell++) {
+            if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &(cursor->cur_cell))) { return rt; }
+            if(cursor->cur_cell.key >= key)
+                break;
+        }
+        if(trail->n_cur_cell == trail->btn->n_cells) {
+            trail->n_cur_cell--;
+            return CHIDB_ENOTFOUND;
+        }
+
+        return CHIDB_OK;
+    }
+    else {
+        BTreeCell cell;
+        npage_t lower_layer_page;
+        for(; trail->n_cur_cell < trail->btn->n_cells; trail->n_cur_cell++) {
+            if(rt = chidb_Btree_getCell(trail->btn, trail->n_cur_cell, &cell)) { return rt; }
+            if(cell.key >= key)
+                break;
+        }
+        if(trail->n_cur_cell == trail->btn->n_cells) {
+            lower_layer_page = trail->btn->right_page;
+        } else {
+            lower_layer_page = cell.type == PGTYPE_INDEX_INTERNAL ?
+                                    cell.fields.indexInternal.child_page:
+                                    cell.fields.tableInternal.child_page;
+        }
+
+        chidb_dbm_trail_t *new_trail;
+        chidb_dbm_trail_new(cursor->bt, &new_trail, lower_layer_page);
+        new_trail->depth = trail->depth + 1;
+        new_trail->n_cur_cell = 0;
+        list_append(&(cursor->trail_list), new_trail);
+        return chidb_dbm_cursor_seek_helper(cursor, key);
+    }
+}
+
 int chidb_dbm_cursor_rewind(chidb_dbm_cursor_t *cursor)
 {
     chidb_dbm_trail_t *tmp_trail;
@@ -289,5 +333,79 @@ int chidb_dbm_cursor_prev(chidb_dbm_cursor_t *cursor)
 
 int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_key_t key, chidb_dbm_seek_type_t seek_type)
 {
+    chidb_dbm_trail_t *tmp_trail;
+    while(!list_empty(&(cursor->trail_list)))
+    {
+        tmp_trail = (chidb_dbm_trail_t *)list_fetch(&(cursor->trail_list));
+        chidb_dbm_trail_destory(cursor, tmp_trail);
+    }
+    int rt = chidb_dbm_cursor_seek_helper(cursor, key);
+
+    switch(seek_type){
+
+    case SEEKEQ:
+        if(rt) {
+            return rt;
+        }
+        else if(cursor->cur_cell.key != key){
+            return CHIDB_ENOTFOUND;
+        }
+        else {
+            return CHIDB_OK;
+        }
+        break;
+    case SEEKLE:
+        if(rt && rt != CHIDB_ENOTFOUND) {
+            return rt;
+        }
+        else if(cursor->cur_cell.key != key){
+            if(rt = chidb_dbm_cursor_prev(cursor)) {
+                return CHIDB_ENOTFOUND;
+            }
+            return CHIDB_OK;
+        }
+        else {
+            return CHIDB_OK;
+        }
+        break;
+    case SEEKGE:
+        if(rt) {
+            return rt;
+        }
+        else {
+            return CHIDB_OK;
+        }
+        break;
+    case SEEKLT:
+        if(rt && rt != CHIDB_ENOTFOUND) {
+            return rt;
+        }
+        else if(rt && rt == CHIDB_ENOTFOUND) {
+            return CHIDB_OK;
+        }
+        else {
+            if(rt = chidb_dbm_cursor_prev(cursor)) {
+                return CHIDB_ENOTFOUND;
+            }
+            return CHIDB_OK;
+        }
+        break;
+    case SEEKGT:
+        if(rt) {
+            return rt;
+        }
+        else if(cursor->cur_cell.key == key){
+            if(rt = chidb_dbm_cursor_next(cursor)) {
+                return CHIDB_ENOTFOUND;
+            }
+            return CHIDB_OK;
+        }
+        else {
+            return CHIDB_OK;
+        }
+        break;
+    
+    }
+
     return CHIDB_OK;
 }
