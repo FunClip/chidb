@@ -49,6 +49,7 @@
 #include <assert.h>
 #include <string.h>
 #include <chidb/chidb.h>
+#include "../simclist/simclist.h"
 
 // Private codes (shouldn't be used by API users)
 #define CHIDB_NOHEADER (1)

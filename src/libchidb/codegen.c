@@ -46,7 +46,7 @@
 // 在api.c中实现
 int load_schema(chidb *db, npage_t nroot);
 
-chidb_dbm_op_t *chidb_make_op(opcode_t code, int32_t p1, int32_t p2, int32_t p3, char *p4)
+chidb_dbm_op_t *make_op(opcode_t code, int32_t p1, int32_t p2, int32_t p3, char *p4)
 {
     chidb_dbm_op_t *op = malloc(sizeof(chidb_dbm_op_t));
     op->opcode = code;
@@ -57,11 +57,73 @@ chidb_dbm_op_t *chidb_make_op(opcode_t code, int32_t p1, int32_t p2, int32_t p3,
     return op;
 }
 
+int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t *ops)
+{
+    if (chidb_check_table_exist(stmt->db->schemas, sql_stmt->stmt.create->table->name)) {
+        return CHIDB_EINVALIDSQL;
+    }
+
+    (sql_stmt->text)[strlen(sql_stmt->text)-1] = 0;
+
+    list_append(ops, make_op(
+        Op_Integer, 1, 0, 0, NULL
+    )); // 在rr0存root_page(1)
+
+    list_append(ops, make_op(
+        Op_OpenWrite, 0, 0, 5, NULL
+    )); // 在cursor0打开根为rr0存的整数的页的表，有5列
+
+    list_append(ops, make_op(
+        Op_CreateTable, 4, 0, 0, NULL
+    )); // 新建一个table，并将rootpage存在rr4
+
+    list_append(ops, make_op(
+        Op_String, 5, 1, 0, "table"
+    )); // schema 表的第一列schema type
+
+    list_append(ops, make_op(
+        Op_String, strlen(sql_stmt->stmt.create->table->name), 2, 0, sql_stmt->stmt.create->table->name
+    )); // schema 表的第2列表名
+
+    list_append(ops, make_op(
+        Op_String, strlen(sql_stmt->stmt.create->table->name), 3, 0, sql_stmt->stmt.create->table->name
+    )); // schema 表的第3列关联表名
+
+    list_append(ops, make_op(
+        Op_String, strlen(sql_stmt->text), 5, 0, sql_stmt->text
+    )); // schema 表的第5列表创建SQL
+
+    list_append(ops, make_op(
+        Op_MakeRecord, 1, 5, 6, NULL
+    )); // 生成一条表记录
+
+    list_append(ops, make_op(
+        Op_Integer, list_size(&(stmt->db->schemas)) + 1, 7, 0, NULL
+    )); // 表记录的主键key
+
+    list_append(ops, make_op(
+        Op_Insert, 0, 6, 7, NULL
+    )); // 插入
+
+    list_append(ops, make_op(
+        Op_Close, 0, 0, 0, NULL
+    ));
+
+    return CHIDB_OK;
+}
+
+int chidb_codegen_insert(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t *ops)
+{
+
+}
+
+int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t *ops)
+{
+
+}
 
 int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
 {
-    sql_stmt->text[strlen(sql_stmt->text) - 1] = '\0'; // 删除结尾的分号
-
     // 如果之前执行了create table的指令, 则需要重新load schema
     if (stmt->db->synced == 0)
     {
@@ -93,14 +155,14 @@ int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
     switch (sql_stmt->type)
     {
     case STMT_CREATE:
-        rt = chidb_create_codegen(stmt, sql_stmt, &ops);
+        rt = chidb_codegen_create(stmt, sql_stmt, &ops);
         stmt->db->synced = 0;
         break;
     case STMT_SELECT:
-        rt = chidb_select_codegen(stmt, sql_stmt, &ops);
+        rt = chidb_codegen_select(stmt, sql_stmt, &ops);
         break;
     case STMT_INSERT:
-        rt = chidb_insert_codegen(stmt, sql_stmt, &ops);
+        rt = chidb_codegen_insert(stmt, sql_stmt, &ops);
         break;
     default:
         break;
