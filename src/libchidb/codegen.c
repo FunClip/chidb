@@ -118,7 +118,84 @@ int chidb_codegen_insert(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
         return CHIDB_EINVALIDSQL;
     }
 
+    list_t cols;
+    list_init(&cols);
+    chidb_get_columns_of_table(stmt->db->schemas, sql_stmt->stmt.insert->table_name, &cols);
 
+    // 检查类型
+    list_iterator_start(&cols);
+    Literal_t *value = sql_stmt->stmt.insert->values;
+    Literal_t *val = value;
+    while (list_iterator_hasnext(&cols))
+    {
+        Column_t *col = list_iterator_next(&cols);
+        if(val == NULL) {
+            list_destroy(&cols);
+            return CHIDB_EINVALIDSQL;
+        }
+        if(val->t != col->type) {
+            list_destroy(&cols);
+            return CHIDB_EINVALIDSQL;
+        }
+        val = val->next;
+    }
+    list_iterator_stop(&cols);
+
+    // 生成指令
+    int root_page = chidb_get_root_page_of_table(stmt->db->schemas, sql_stmt->stmt.insert->table_name);
+    list_append(ops, make_op(
+        Op_Integer, root_page, 0, 0, NULL
+    )); // 在rr0存储表的根页号
+
+    list_append(ops, make_op(
+        Op_OpenWrite, 0, 0, list_size(&cols), NULL
+    )); // 在cursor0打开rr0中存储的根页号的表
+
+    int i = 1;
+    val = value;
+    while(val) {
+        switch (val->t)
+        {
+        case TYPE_INT:
+            list_append(ops, make_op(
+                Op_Integer, val->val.ival, i++, 0, NULL
+            ));
+            break;
+        case TYPE_TEXT:
+            list_append(ops, make_op(
+                Op_String, strlen(val->val.strval), i++, 0, val->val.strval
+            ));
+            break;
+        case TYPE_CHAR:
+            break;
+        case TYPE_DOUBLE:
+            break;
+        default:
+            break;
+        }
+        if(i == 2) {
+            list_append(ops, make_op(
+                Op_Null, 0, i++, 0, NULL
+            ));
+        }
+
+        val = val->next;
+    }
+
+    list_append(ops, make_op(
+        Op_MakeRecord, 2, i-2, i, NULL
+    )); // 从rr2到rri-2的数据组合成一条记录
+
+    list_append(ops, make_op(
+        Op_Insert, 0, i, 1, NULL
+    )); // 插入rri上的记录到cursor0，key在rr1上
+
+    list_append(ops, make_op(
+        Op_Close, 0, 0, 0, NULL
+    )); // 关闭cursor0
+
+    list_destroy(&cols);
+    return CHIDB_OK;
 }
 
 int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t *ops)
