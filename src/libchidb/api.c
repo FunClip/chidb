@@ -57,6 +57,59 @@ int chidb_stmt_optimize(chidb *db,
 			chisql_statement_t **sql_stmt_opt);
 
   /* your code */
+int load_schema(chidb *db, npage_t nroot)
+{
+	Btree *bt = db->bt;
+
+	// 读取nroot页
+	BTreeNode *btn;
+	chidb_Btree_getNodeByPage(bt, nroot, &btn);
+
+	// 遍历当前页面的所有cells
+	for (int i = 0; i < btn->n_cells; ++i)
+	{
+		BTreeCell cell;
+		chidb_Btree_getCell(btn, i, &cell);
+
+		// 如果是页表内部结点
+		if (btn->type == PGTYPE_TABLE_INTERNAL)
+		{
+			load_schema(db, cell.fields.tableInternal.child_page);
+		}
+		// 如果是页表叶子结点
+		else if (btn->type == PGTYPE_TABLE_LEAF)
+		{
+			DBRecord *dbr;
+			chidb_DBRecord_unpack(&dbr, cell.fields.tableLeaf.data);
+			// 为schema中的一行申请空间
+			chidb_schema_t *item = malloc(sizeof(chidb_schema_t));
+			// 将Record中的字段写入schema
+			chidb_DBRecord_getString(dbr, 0, &item->type);
+			chidb_DBRecord_getString(dbr, 1, &item->name);
+			chidb_DBRecord_getString(dbr, 2, &item->assoc);
+			chidb_DBRecord_getInt32 (dbr, 3, &item->root_page);
+			char *sql;
+			chidb_DBRecord_getString(dbr, 4, &sql);
+			// 解析sql语句写入schema->stmt
+			chisql_parser(sql, &item->stmt);
+			// 将该行加入到db中的schema里
+			list_append(&db->schemas, item);
+			// 释放空间
+			free(sql);
+			chidb_DBRecord_destroy(dbr);
+		}
+	}
+
+	// 如果不是叶子结点, 则还需要加载right page
+	if (btn->type != PGTYPE_TABLE_LEAF)
+	{
+		load_schema(db, btn->right_page);
+	}
+
+	// 释放内存
+	chidb_Btree_freeMemNode(bt, btn);
+	return CHIDB_OK;
+}
 
 int chidb_open(const char *file, chidb **db)
 {
@@ -66,16 +119,31 @@ int chidb_open(const char *file, chidb **db)
     chidb_Btree_open(file, *db, &(*db)->bt);
 
     /* Additional initialization code goes here */
+    list_init(&((*db)->schemas));
+    load_schema(*db, 1);
+    (*db)->synced = 1;
+
     return CHIDB_OK;
 }
 
 int chidb_close(chidb *db)
 {
     chidb_Btree_close(db->bt);
-    free(db);
+    // free(db);
 
     /* Additional cleanup code goes here */
-
+    while (!list_empty(&(db->schemas)))
+    {
+        chidb_schema_t *item = (chidb_schema_t *)list_fetch(&(db->schemas));
+        chisql_statement_free(item->stmt);
+        free(item->type);
+        free(item->name);
+        free(item->assoc);
+        free(item);
+    }
+    // 释放list的空间
+    list_destroy(&(db->schemas));
+    free(db);
     return CHIDB_OK;
 }
 

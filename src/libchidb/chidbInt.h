@@ -75,7 +75,14 @@ typedef uint32_t chidb_key_t;
 /* Forward declaration */
 typedef struct BTree BTree;
 
-
+typedef struct chidb_schema
+{
+    char *type;
+    char *name;
+    char *assoc;
+    int root_page;
+    chisql_statement_t *stmt;
+} chidb_schema_t;
   /* code */
 
 /* A chidb database is initially only a BTree.
@@ -86,6 +93,8 @@ typedef struct BTree BTree;
 struct chidb
 {
     BTree   *bt;
+    list_t schemas;
+    int synced; // 1 已同步， 0 创建新表后未同步
 };
 
 #endif /*CHIDBINT_H_*/

@@ -43,42 +43,96 @@
 #include "util.h"
 
   /* ...code... */
+// 在api.c中实现
+int load_schema(chidb *db, npage_t nroot);
+
+chidb_dbm_op_t *chidb_make_op(opcode_t code, int32_t p1, int32_t p2, int32_t p3, char *p4)
+{
+    chidb_dbm_op_t *op = malloc(sizeof(chidb_dbm_op_t));
+    op->opcode = code;
+    op->p1 = p1;
+    op->p2 = p2;
+    op->p3 = p3;
+    op->p4 = p4;
+    return op;
+}
+
 
 int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
 {
-    int opnum = 0;
-    int nOps;
+    sql_stmt->text[strlen(sql_stmt->text) - 1] = '\0'; // 删除结尾的分号
 
-    /* Manually load a program that just produces five result rows, with
-     * three columns: an integer identifier, the SQL query (text), and NULL. */
+    // 如果之前执行了create table的指令, 则需要重新load schema
+    if (stmt->db->synced == 0)
+    {
+        // 不断获取list中的第一个值并释放其中的指针指向的空间
+        while (!list_empty(&stmt->db->schemas))
+        {
+            chidb_schema_t *item = (chidb_schema_t *)list_fetch(&stmt->db->schemas);
+            chisql_statement_free(item->stmt);
+            free(item->type);
+            free(item->name);
+            free(item->assoc);
+            free(item);
+        }
+        // 释放list的空间
+        list_destroy(&stmt->db->schemas);
+        // 重新初始化schema
+        list_init(&stmt->db->schemas);
+        // 重新load schema
+        load_schema(stmt->db, 1);
+        // 更新同步标识为1
+        stmt->db->synced = 1;
+    }
 
-    stmt->nCols = 3;
-    stmt->cols = malloc(sizeof(char *) * stmt->nCols);
-    stmt->cols[0] = strdup("id");
-    stmt->cols[1] = strdup("sql");
-    stmt->cols[2] = strdup("null");
+    list_t ops;
+    list_init(&ops);
 
-    chidb_dbm_op_t ops[] = {
-            {Op_Integer, 1, 0, 0, NULL},
-            {Op_String, strlen(sql_stmt->text), 1, 0, sql_stmt->text},
-            {Op_Null, 0, 2, 0, NULL},
-            {Op_ResultRow, 0, 3, 0, NULL},
-            {Op_Integer, 2, 0, 0, NULL},
-            {Op_ResultRow, 0, 3, 0, NULL},
-            {Op_Integer, 3, 0, 0, NULL},
-            {Op_ResultRow, 0, 3, 0, NULL},
-            {Op_Integer, 4, 0, 0, NULL},
-            {Op_ResultRow, 0, 3, 0, NULL},
-            {Op_Integer, 5, 0, 0, NULL},
-            {Op_ResultRow, 0, 3, 0, NULL},
-            {Op_Halt, 0, 0, 0, NULL},
-    };
+    // 根据不同的语句调用不同的代码生成, 将指令添加到ops中
+    int rt = CHIDB_EINVALIDSQL;
+    switch (sql_stmt->type)
+    {
+    case STMT_CREATE:
+        rt = chidb_create_codegen(stmt, sql_stmt, &ops);
+        stmt->db->synced = 0;
+        break;
+    case STMT_SELECT:
+        rt = chidb_select_codegen(stmt, sql_stmt, &ops);
+        break;
+    case STMT_INSERT:
+        rt = chidb_insert_codegen(stmt, sql_stmt, &ops);
+        break;
+    default:
+        break;
+    }
 
-    nOps = sizeof(ops) / sizeof(chidb_dbm_op_t);
+    if (rt != CHIDB_OK)
+    {
+        // 释放空间
+        while (!list_empty(&ops))
+        {
+            free(list_fetch(&ops));
+        }
+        list_destroy(&ops);
+        return rt;
+    }
 
-    for(int i=0; i < nOps; i++)
-        chidb_stmt_set_op(stmt, &ops[i], opnum++);
+    stmt->sql = sql_stmt;
+    stmt->nOps = list_size(&ops);
 
+    // 添加指令到stmt中
+    int i = 0;
+    list_iterator_start(&ops);
+    while (list_iterator_hasnext(&ops))
+    {
+        chidb_dbm_op_t *op = (chidb_dbm_op_t *)(list_iterator_next(&ops));
+        chidb_stmt_set_op(stmt, op, i++);
+        free(op);
+    }
+    list_iterator_stop(&ops);
+
+    // 释放空间
+    list_destroy(&ops);
     return CHIDB_OK;
 
 }
