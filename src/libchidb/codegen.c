@@ -114,6 +114,10 @@ int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
 
 int chidb_codegen_insert(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t *ops)
 {
+    if (!chidb_check_table_exist(stmt->db->schemas, sql_stmt->stmt.insert->table_name)) {
+        return CHIDB_EINVALIDSQL;
+    }
+
 
 }
 
@@ -124,10 +128,8 @@ int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
 
 int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
 {
-    // 如果之前执行了create table的指令, 则需要重新load schema
     if (stmt->db->synced == 0)
     {
-        // 不断获取list中的第一个值并释放其中的指针指向的空间
         while (!list_empty(&stmt->db->schemas))
         {
             chidb_schema_t *item = (chidb_schema_t *)list_fetch(&stmt->db->schemas);
@@ -137,20 +139,16 @@ int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
             free(item->assoc);
             free(item);
         }
-        // 释放list的空间
+
         list_destroy(&stmt->db->schemas);
-        // 重新初始化schema
         list_init(&stmt->db->schemas);
-        // 重新load schema
         load_schema(stmt->db, 1);
-        // 更新同步标识为1
         stmt->db->synced = 1;
     }
 
     list_t ops;
     list_init(&ops);
 
-    // 根据不同的语句调用不同的代码生成, 将指令添加到ops中
     int rt = CHIDB_EINVALIDSQL;
     switch (sql_stmt->type)
     {
@@ -170,7 +168,6 @@ int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
 
     if (rt != CHIDB_OK)
     {
-        // 释放空间
         while (!list_empty(&ops))
         {
             free(list_fetch(&ops));
@@ -182,7 +179,6 @@ int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
     stmt->sql = sql_stmt;
     stmt->nOps = list_size(&ops);
 
-    // 添加指令到stmt中
     int i = 0;
     list_iterator_start(&ops);
     while (list_iterator_hasnext(&ops))
@@ -193,9 +189,7 @@ int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
     }
     list_iterator_stop(&ops);
 
-    // 释放空间
     list_destroy(&ops);
     return CHIDB_OK;
-
 }
 
