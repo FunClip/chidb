@@ -379,11 +379,13 @@ int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
             jmp_op = make_op(
                 cmp_opcode, regi-2, 0, regi-1, NULL
             );
+            list_append(ops, jmp_op);
         }
     }
-
+    else {
+        next_to_pc = list_size(ops);
+    }
     // 生成结果行
-    next_to_pc = list_size(ops);
     int col_start_rr = regi;
     list_iterator_start(&select_cols);
     while(list_iterator_hasnext(&select_cols)) {
@@ -433,6 +435,7 @@ int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
     ));
 
     stmt->nCols = list_size(&select_cols);
+    stmt->nRR = stmt->nCols;
     stmt->cols = malloc(stmt->nCols * sizeof(char*));
     for(int i = 0; i < stmt->nCols; i++) {
         stmt->cols[i] = strdup(list_get_at(&select_cols, i));
@@ -501,6 +504,7 @@ int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
     while (list_iterator_hasnext(&ops))
     {
         chidb_dbm_op_t *op = (chidb_dbm_op_t *)(list_iterator_next(&ops));
+        // chidb_stmt_op_print(op);
         chidb_stmt_set_op(stmt, op, i++);
         free(op);
     }
