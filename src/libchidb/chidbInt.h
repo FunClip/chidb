@@ -49,6 +49,7 @@
 #include <assert.h>
 #include <string.h>
 #include <chidb/chidb.h>
+#include "../simclist/simclist.h"
 
 // Private codes (shouldn't be used by API users)
 #define CHIDB_NOHEADER (1)
@@ -60,7 +61,9 @@
 #define CHIDB_EDUPLICATE (8)
 #define CHIDB_EEMPTY (9)
 #define CHIDB_EPARSE (10)
+#define CHIDB_EMOVE (-1)
 
+#define CHIDB_EVALIDEARG (11)
 
 #define DEFAULT_PAGE_SIZE (1024)
 
@@ -73,7 +76,14 @@ typedef uint32_t chidb_key_t;
 /* Forward declaration */
 typedef struct BTree BTree;
 
-
+typedef struct chidb_schema
+{
+    char *type;
+    char *name;
+    char *assoc;
+    int root_page;
+    chisql_statement_t *stmt;
+} chidb_schema_t;
   /* code */
 
 /* A chidb database is initially only a BTree.
@@ -84,6 +94,8 @@ typedef struct BTree BTree;
 struct chidb
 {
     BTree   *bt;
+    list_t schemas;
+    int synced; // 1 已同步， 0 创建新表后未同步
 };
 
 #endif /*CHIDBINT_H_*/

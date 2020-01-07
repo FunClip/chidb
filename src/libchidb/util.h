@@ -43,6 +43,7 @@
 #include "chidbInt.h"
 #include "btree.h"
 #include <chidb/utils.h>
+#include "../simclist/simclist.h"
 
 /*
 ** Read or write a two- and four-byte big-endian integer values.
@@ -68,5 +69,20 @@ void chidb_BTree_stringPrinter(BTreeNode *btn, BTreeCell *btc);
 
 FILE *copy(const char *from, const char *to);
 
+// Given a table name, determine whether such a table exists.
+int chidb_check_table_exist(list_t schema, char *table);
+// Given a table name, obtain its root page.
+int chidb_get_root_page_of_table(list_t schema, char *table);
+// Given a table name and a column name, determine whether such a column exists in the table.
+int chidb_check_column_exist(list_t schema, char *table, char *column);
+// Given a table name and a column name, obtain the type of the column.
+int chidb_get_type_of_column(list_t schema, char *table, char *column);
 
+// Given a table name and a column name, obtain all the column.
+int chidb_get_columns_of_table(list_t schema, char *table, list_t *columns);
+
+// 根据列名获取列位置
+int index_of_column(list_t *columns, char *name);
+
+void chisql_statement_free(chisql_statement_t *sql_stmt);
 #endif /*UTIL_H_*/

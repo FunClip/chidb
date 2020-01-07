@@ -43,6 +43,7 @@
 
 #include "chidbInt.h"
 #include "btree.h"
+#include "../simclist/simclist.h"
 
 typedef enum chidb_dbm_cursor_type
 {
@@ -51,15 +52,45 @@ typedef enum chidb_dbm_cursor_type
     CURSOR_WRITE
 } chidb_dbm_cursor_type_t;
 
+typedef struct chidb_dbm_trail {
+    u_int32_t depth;    // 该块在Btree中的深度
+    BTreeNode *btn;     // BtreeNode
+    ncell_t n_cur_cell;        // 当前行在该btn中对应或能索引到的cell编号
+} chidb_dbm_trail_t;
+
 typedef struct chidb_dbm_cursor
 {
     chidb_dbm_cursor_type_t type;
 
     /* Your code goes here */
+    list_t trail_list;
+    Btree *bt;
+    BTreeCell cur_cell;
+    npage_t root_page;
+    uint32_t n_cols;
 
 } chidb_dbm_cursor_t;
 
+typedef enum chidb_dbm_seek_type
+{
+    SEEKEQ,
+    SEEKLE,
+    SEEKGE,
+    SEEKLT,
+    SEEKGT
+} chidb_dbm_seek_type_t;
+
 /* Cursor function definitions go here */
 
+int chidb_dbm_cursor_init(Btree *bt, chidb_dbm_cursor_t *cursor, npage_t root_page, chidb_dbm_cursor_type_t type);
+int chidb_dbm_cursor_destroy(chidb_dbm_cursor_t *cursor);
+
+int chidb_dbm_trail_new(Btree *bt, chidb_dbm_trail_t **trail, npage_t npage);
+int chidb_dbm_trail_destroy(chidb_dbm_cursor_t *cursor, chidb_dbm_trail_t *trail);
+
+int chidb_dbm_cursor_rewind(chidb_dbm_cursor_t *cursor);
+int chidb_dbm_cursor_next(chidb_dbm_cursor_t *cursor);
+int chidb_dbm_cursor_prev(chidb_dbm_cursor_t *cursor);
+int chidb_dbm_cursor_seek(chidb_dbm_cursor_t *cursor, chidb_key_t key, chidb_dbm_seek_type_t seek_type);
 
 #endif /* DBM_CURSOR_H_ */

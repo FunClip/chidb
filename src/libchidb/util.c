@@ -282,3 +282,188 @@ int chidb_tokenize(char *str, char ***tokens)
     return ntokens;
 }
 
+// ---- Codes ----
+
+int chidb_check_table_exist(list_t schema, char *table)
+{
+    list_iterator_start(&schema);
+
+    while (list_iterator_hasnext(&schema))
+    {
+        chidb_schema_t *item = list_iterator_next(&schema);
+        // name 与 table相等则返回1
+        if (!strcmp(item->name, table) && !strcmp(item->type, "table"))
+        {
+            list_iterator_stop(&schema);
+            return 1;
+        }
+    }
+    list_iterator_stop(&schema);
+
+    // 不存在返回0
+    return 0;
+}
+
+int chidb_get_root_page_of_table(list_t schema, char *table)
+{
+    list_iterator_start(&schema);
+
+    while (list_iterator_hasnext(&schema))
+    {
+        chidb_schema_t *item = list_iterator_next(&schema);
+        // name 与 table相等则返回对应的root page
+        if (!strcmp(item->name, table) && !strcmp(item->type, "table"))
+        {
+            list_iterator_stop(&schema);
+            return item->root_page;
+        }
+    }
+    list_iterator_stop(&schema);
+
+    // 不存在返回0
+    return 0;
+}
+
+int chidb_check_column_exist(list_t schema, char *table, char *column)
+{
+    list_iterator_start(&schema);
+
+    while (list_iterator_hasnext(&schema))
+    {
+        chidb_schema_t *item = list_iterator_next(&schema);
+        // name 与 table相等则在其中查找
+        if (!strcmp(item->name, table) && !strcmp(item->type, "table"))
+        {
+            // 遍历列
+            Column_t *cur_column = item->stmt->stmt.create->table->columns;
+            while (cur_column != NULL)
+            {
+                // 若当前列名与给定列名相同, 返回1
+                if (!strcmp(cur_column->name, column))
+                {
+                    list_iterator_stop(&schema);
+                    return 1;
+                }
+                // 若不同则更新当前列指针指向下一列
+                cur_column = cur_column->next;
+            }
+            // 不存在返回0
+            list_iterator_stop(&schema);
+            return 0;
+        }
+    }
+
+    list_iterator_stop(&schema);
+    // 不存在返回0
+    return 0;
+}
+
+int chidb_get_type_of_column(list_t schema, char *table, char *column)
+{
+    list_iterator_start(&schema);
+
+    // 遍历schema每一项
+    while (list_iterator_hasnext(&schema))
+    {
+        chidb_schema_t *item = (chidb_schema_t *)(list_iterator_next(&schema));
+        // name 与 table相等则在其中查找
+        if (!strcmp(item->name, table) && !strcmp(item->type, "table"))
+        {
+            // 遍历列
+            Column_t *cur_column = item->stmt->stmt.create->table->columns;
+            while (cur_column != NULL)
+            {
+                // 若当前列名与给定列名相同, 返回类型
+                if (!strcmp(cur_column->name, column))
+                {
+                    list_iterator_stop(&schema);
+                    return cur_column->type;
+                }
+                // 若不同则更新当前列指针指向下一列
+                cur_column = cur_column->next;
+            }
+            // 不存在返回-1
+            list_iterator_stop(&schema);
+            return -1;
+        }
+    }
+
+    list_iterator_stop(&schema);
+    // 不存在返回-1
+    return -1;
+}
+
+int chidb_get_columns_of_table(list_t schema, char *table, list_t *columns)
+{
+    list_iterator_start(&schema);
+
+    while (list_iterator_hasnext(&schema))
+    {
+        chidb_schema_t *item = list_iterator_next(&schema);
+        // name 与 table相等则获取其中的列后返回
+        if (!strcmp(item->name, table) && !strcmp(item->type, "table"))
+        {
+            // 遍历列, 添加到列名列表中
+            Column_t *column = item->stmt->stmt.create->table->columns;
+            while (column != NULL)
+            {
+                list_append(columns, column);
+                column = column->next;
+            }
+
+            list_iterator_stop(&schema);
+            return CHIDB_OK;
+        }
+    }
+
+    list_iterator_stop(&schema);
+    // 不存在返回错误
+    return CHIDB_EINVALIDSQL;
+}
+
+void chisql_statement_free(chisql_statement_t *sql_stmt)
+{
+    switch (sql_stmt->type)
+    {
+        case STMT_CREATE:
+        {
+            Create_free(sql_stmt->stmt.create);
+        } break;
+
+        case STMT_SELECT:
+        {
+            SRA_free(sql_stmt->stmt.select);
+        } break;
+
+        case STMT_INSERT:
+        {
+            Insert_free(sql_stmt->stmt.insert);
+        } break;
+
+        case STMT_DELETE:
+        {
+            Delete_free(sql_stmt->stmt.delete);
+        } break;
+    }
+
+    free(sql_stmt->text);
+    free(sql_stmt);
+}
+
+int index_of_column(list_t *columns, char *name)
+{
+    int i = 0;
+    list_iterator_start(columns);
+    while (list_iterator_hasnext(columns))
+    {
+        Column_t *column = list_iterator_next(columns);
+        if (!strcmp(name, column->name))
+        {
+            list_iterator_stop(columns);
+            return i;
+        }
+        ++i;
+    }
+    list_iterator_stop(columns);
+    return -1;
+}
