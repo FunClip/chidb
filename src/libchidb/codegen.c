@@ -184,11 +184,11 @@ int chidb_codegen_insert(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
 
     list_append(ops, make_op(
         Op_MakeRecord, 2, i-2, i, NULL
-    )); // 从rr2到rri-2的数据组合成一条记录
+    )); // 从rr2到regi-2的数据组合成一条记录
 
     list_append(ops, make_op(
         Op_Insert, 0, i, 1, NULL
-    )); // 插入rri上的记录到cursor0，key在rr1上
+    )); // 插入regi上的记录到cursor0，key在rr1上
 
     list_append(ops, make_op(
         Op_Close, 0, 0, 0, NULL
@@ -200,7 +200,247 @@ int chidb_codegen_insert(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
 
 int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t *ops)
 {
+    list_t table_cols, select_cols;
+    list_init(&table_cols);
+    list_init(&select_cols);
 
+    SRA_Project_t *project = &sql_stmt->stmt.select->project;
+    SRA_Select_t  *select  = NULL;
+    SRA_Table_t   *table   = NULL;
+
+    if(project->sra->t == SRA_SELECT) {
+        select = &project->sra->select;
+    }
+    if(select) {
+        table = &select->sra->table;
+    }
+    else {
+        table = &project->sra->table;
+    }
+
+    char *tablename = table->ref->table_name;
+
+    // 表检查
+    if(!chidb_check_table_exist(stmt->db->schemas, tablename)) {
+        return CHIDB_EINVALIDSQL;
+    }
+
+    // 列检查
+    chidb_get_columns_of_table(stmt->db->schemas, tablename, &table_cols);
+    Expression_t *exp = project->expr_list;
+    while(exp) {
+        char *colname = exp->expr.term.ref->columnName;
+        if(!strcmp(colname, "*")) {
+            list_iterator_start(&table_cols);
+            while(list_iterator_hasnext(&table_cols)) {
+                Column_t *col = list_iterator_next(&table_cols);
+                list_append(&select_cols, col->name);
+            }
+            list_iterator_stop(&table_cols);
+        }
+        else if(!chidb_check_column_exist(stmt->db->schemas, tablename, colname)) {
+            list_destroy(&table_cols);
+            list_destroy(&select_cols);
+            return CHIDB_EINVALIDSQL;
+        }
+        else {
+            list_append(&select_cols, colname);
+        }
+        exp = exp->next;
+    }
+
+    // 生成指令
+    int regi = 0; // 寄存器编号
+
+    list_append(ops, make_op(
+        Op_Integer, chidb_get_root_page_of_table(stmt->db->schemas, tablename), regi++, 0, NULL
+    )); // root_page存入
+
+    list_append(ops, make_op(
+        Op_OpenRead, 0, 0, list_size(&table_cols), NULL
+    )); // 只读的方式打开表cursor0
+
+    list_append(ops, make_op(
+        Op_Rewind, 0, 0, 0, NULL
+    )); // rewind cursor0
+
+    // 根据select条件生成判断指令
+    int need_loop = 1, using_pk = 0;
+    int next_to_pc;
+    chidb_dbm_op_t *jmp_op = NULL;
+    if(select) {
+        Condition_t *cond = select->cond;
+        char *cond_col = cond->cond.comp.expr1->expr.term.ref->columnName;
+        Literal_t *val = cond->cond.comp.expr2->expr.term.val;
+
+        // 检查比较的值类型是否匹配
+        if(val->t != chidb_get_type_of_column(stmt->db->schemas, tablename, cond_col)) {
+            list_destroy(&table_cols);
+            list_destroy(&select_cols);
+            return CHIDB_EINVALIDSQL;
+        }
+
+        switch (val->t)
+        {
+        case TYPE_INT:
+            list_append(ops, make_op(
+                Op_Integer, val->val.ival, regi++, 0, NULL
+            ));
+            break;
+        case TYPE_TEXT:
+            list_append(ops, make_op(
+                Op_String, strlen(val->val.strval), regi++, 0, val->val.strval
+            ));
+            break;
+        case TYPE_CHAR:
+            break;
+        case TYPE_DOUBLE:
+            break;
+        default:
+            break;
+        }
+
+
+        int col_index = index_of_column(&table_cols, cond_col);
+        // 条件列是主键
+        if(col_index == 0) {
+            opcode_t seek_opcode;
+            switch (cond->t)
+            {
+            case RA_COND_EQ:
+                seek_opcode = Op_Seek;
+                break;
+            case RA_COND_GT:
+                seek_opcode = Op_SeekGt;
+                break;
+            case RA_COND_GEQ:
+                seek_opcode = Op_SeekGe;
+                break;
+            case RA_COND_LEQ:
+                seek_opcode = Op_Gt;
+                break;
+            case RA_COND_LT:
+                seek_opcode = Op_Ge;
+                break;
+            default:
+                break;
+            }
+
+            if(seek_opcode == Op_Ge || seek_opcode == Op_Gt) {
+                next_to_pc = list_size(ops);
+                list_append(ops, make_op(
+                    Op_Key, 0, regi++, 0, NULL
+                ));
+                jmp_op = make_op(
+                    seek_opcode, regi-2, 0, regi-1, NULL
+                );
+                list_append(ops, jmp_op);
+            }
+            else {
+                if(seek_opcode == Op_Seek) {
+                    need_loop = 0;
+                }
+                jmp_op = make_op(
+                    seek_opcode, 0, 0, regi-1, NULL
+                );
+                list_append(ops, jmp_op);
+                next_to_pc = list_size(ops);
+            }
+        }
+        // 条件列不是主键
+        else {
+            next_to_pc = list_size(ops);
+            list_append(ops, make_op(
+                Op_Column, 0, col_index, regi++, NULL
+            ));
+
+            opcode_t cmp_opcode;
+            switch (cond->t)
+            {
+            case RA_COND_EQ:
+                cmp_opcode = Op_Ne;
+                break;
+            case RA_COND_LT:
+                cmp_opcode = Op_Ge;
+                break;
+            case RA_COND_GT:
+                cmp_opcode = Op_Le;
+                break;
+            case RA_COND_LEQ:
+                cmp_opcode = Op_Gt;
+                break;
+            case RA_COND_GEQ:
+                cmp_opcode = Op_Lt;
+                break;
+            default:
+                break;
+            }
+
+            jmp_op = make_op(
+                cmp_opcode, regi-2, 0, regi-1, NULL
+            );
+        }
+    }
+
+    // 生成结果行
+    next_to_pc = list_size(ops);
+    int col_start_rr = regi;
+    list_iterator_start(&select_cols);
+    while(list_iterator_hasnext(&select_cols)) {
+        char *colname = list_iterator_next(&select_cols);
+        int col_index = index_of_column(&table_cols, colname);
+        if(col_index == 0) {
+            list_append(ops, make_op(
+                Op_Key, 0, regi++, 0, NULL
+            ));
+        }
+        else {
+            list_append(ops, make_op(
+                Op_Column, 0, col_index, regi++, NULL
+            ));
+        }
+    }
+    list_iterator_stop(&select_cols);
+
+    list_append(ops, make_op(
+        Op_ResultRow, col_start_rr, regi-col_start_rr, 0 ,NULL
+    ));
+
+    if(jmp_op) {
+        jmp_op->p2 = list_size(ops);
+    }
+
+    // 跳转循环生成结果行
+    if(need_loop) {
+        list_append(ops, make_op(
+            Op_Next, 0, next_to_pc, 0, NULL
+        ));
+    }
+
+    if(jmp_op && using_pk) {
+        jmp_op->p2 = list_size(ops);
+    }
+
+    chidb_dbm_op_t *rewind_op = list_get_at(ops, 2);
+    rewind_op->p2 = list_size(ops);
+
+    list_append(ops, make_op(
+        Op_Close, 0, 0, 0, NULL
+    ));
+
+    list_append(ops, make_op(
+        Op_Halt, 0, 0, 0, NULL
+    ));
+
+    stmt->nCols = list_size(&select_cols);
+    stmt->cols = malloc(stmt->nCols * sizeof(char*));
+    for(int i = 0; i < stmt->nCols; i++) {
+        stmt->cols[i] = strdup(list_get_at(&select_cols, i));
+    }
+
+    list_destroy(&table_cols);
+    list_destroy(&select_cols);
+    return CHIDB_OK;
 }
 
 int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt)
