@@ -892,7 +892,7 @@ int chidb_dbm_op_IdxInsert (chidb_stmt *stmt, chidb_dbm_op_t *op)
 
     BTreeCell cell;
     cell.type = PGTYPE_INDEX_LEAF;
-    cell.key = (uint32_t)reg2->value.i;
+    cell.key = (uint32_t)reg1->value.i;
     cell.fields.indexLeaf.keyPk = (uint32_t)reg2->value.i;
 
     chidb_Btree_insert(stmt->db->bt, c->root_page, &cell);

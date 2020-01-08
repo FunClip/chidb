@@ -110,6 +110,7 @@ int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
             Op_Close, 0, 0, 0, NULL
         ));
     }
+// ================ 支持索引 ================
     else {
         list_t cols;
         list_init(&cols);
@@ -122,7 +123,7 @@ int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
             return CHIDB_EINVALIDSQL;
         }
         int root_page = chidb_check_index_exist(stmt->db->schemas, sql_stmt->stmt.create->index->table_name, sql_stmt->stmt.create->index->column_name);
-        if(!root_page) {
+        if(root_page) {
             return CHIDB_EINVALIDSQL;
         }
         int n_col = index_of_column(&cols, sql_stmt->stmt.create->index->column_name);
@@ -180,10 +181,6 @@ int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
         )); // 在rr0存root_page(1)
 
         list_append(ops, make_op(
-            Op_Integer, root_page, regi++, 0, NULL
-        )); 
-
-        list_append(ops, make_op(
             Op_OpenRead, 0, 0, list_size(&cols), NULL
         ));
 
@@ -191,7 +188,7 @@ int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
         list_append(ops, table_rewind);
 
         list_append(ops, make_op(
-            Op_OpenWrite, 1, 1, 0, NULL
+            Op_OpenWrite, 1, 4, 0, NULL
         ));
 
         int jmp_pc = list_size(ops);
@@ -226,6 +223,7 @@ int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
             Op_Halt, 0, 0, 0, NULL
         ));
     }
+// ================ 支持索引 ================
     return CHIDB_OK;
 }
 
@@ -277,6 +275,30 @@ int chidb_codegen_insert(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
             list_append(ops, make_op(
                 Op_Integer, val->val.ival, i++, 0, NULL
             ));
+// ================ 支持索引 ================
+            if(i > 2) {
+                Column_t *col = list_get_at(&cols, i-3);
+                fflush(stdout);
+                int index_page = chidb_check_index_exist(stmt->db->schemas, sql_stmt->stmt.insert->table_name, col->name);
+                if(index_page) {
+                    list_append(ops, make_op(
+                        Op_Integer, index_page, 0, 0, NULL
+                    ));
+
+                    list_append(ops, make_op(
+                        Op_OpenWrite, 1, 0, 0, NULL
+                    ));
+
+                    list_append(ops, make_op(
+                        Op_IdxInsert, 1, i-1, 1, NULL
+                    ));
+
+                    list_append(ops, make_op(
+                        Op_Close, 1, 0, 0, NULL
+                    ));
+                }
+            }
+// ================ 支持索引 ================
             break;
         case TYPE_TEXT:
             list_append(ops, make_op(
@@ -384,7 +406,7 @@ int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
     // 根据select条件生成判断指令
     int need_loop = 1, using_pk = 0;
     int next_to_pc;
-    chidb_dbm_op_t *jmp_op = NULL;
+    chidb_dbm_op_t *jmp_op = NULL, *idx_jmp_op = NULL;
     if(select) {
         Condition_t *cond = select->cond;
         char *cond_col = cond->cond.comp.expr1->expr.term.ref->columnName;
@@ -466,10 +488,6 @@ int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
         }
         // 条件列不是主键
         else {
-            next_to_pc = list_size(ops);
-            list_append(ops, make_op(
-                Op_Column, 0, col_index, regi++, NULL
-            ));
 
             opcode_t cmp_opcode;
             switch (cond->t)
@@ -492,11 +510,47 @@ int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
             default:
                 break;
             }
+// ================ 支持索引 ================
+            int index_page = chidb_check_index_exist(stmt->db->schemas, tablename, cond_col);
+            if(cmp_opcode == Op_Ne && index_page) {
+                need_loop = 0;
+                list_append(ops, make_op(
+                    Op_Integer, index_page, 0, 0, NULL
+                ));
 
-            jmp_op = make_op(
-                cmp_opcode, regi-2, 0, regi-1, NULL
-            );
-            list_append(ops, jmp_op);
+                list_append(ops, make_op(
+                    Op_OpenRead, 1, 0, 0, NULL
+                ));
+
+                idx_jmp_op = make_op(
+                    Op_Seek, 1, 0, regi-1, NULL
+                );
+                list_append(ops, idx_jmp_op);
+
+                list_append(ops, make_op(
+                    Op_IdxPKey, 1, regi-1,0 ,NULL
+                ));
+
+                list_append(ops, make_op(
+                    Op_Close, 1, 0, 0, NULL
+                ));
+
+                jmp_op = make_op(
+                    Op_Seek, 0, 0, regi-1, NULL
+                );
+                list_append(ops, jmp_op);
+            }
+// ================ 支持索引 ================
+            else {
+                next_to_pc = list_size(ops);
+                list_append(ops, make_op(
+                    Op_Column, 0, col_index, regi++, NULL
+                ));
+                jmp_op = make_op(
+                    cmp_opcode, regi-2, 0, regi-1, NULL
+                );
+                list_append(ops, jmp_op);
+            }
         }
     }
     else {
@@ -539,7 +593,11 @@ int chidb_codegen_select(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t 
     if(jmp_op && using_pk) {
         jmp_op->p2 = list_size(ops);
     }
-
+// ================ 支持索引 ================
+    if(idx_jmp_op) {
+        idx_jmp_op->p2 = list_size(ops);
+    }
+// ================ 支持索引 ================
     chidb_dbm_op_t *rewind_op = list_get_at(ops, 2);
     rewind_op->p2 = list_size(ops);
 
