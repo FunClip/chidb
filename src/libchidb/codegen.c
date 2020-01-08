@@ -59,56 +59,173 @@ chidb_dbm_op_t *make_op(opcode_t code, int32_t p1, int32_t p2, int32_t p3, char 
 
 int chidb_codegen_create(chidb_stmt *stmt, chisql_statement_t *sql_stmt, list_t *ops)
 {
-    if (chidb_check_table_exist(stmt->db->schemas, sql_stmt->stmt.create->table->name)) {
-        return CHIDB_EINVALIDSQL;
+    if(sql_stmt->stmt.create->t == CREATE_TABLE){
+        if (chidb_check_table_exist(stmt->db->schemas, sql_stmt->stmt.create->table->name)) {
+            return CHIDB_EINVALIDSQL;
+        }
+
+        (sql_stmt->text)[strlen(sql_stmt->text)-1] = 0;
+
+        list_append(ops, make_op(
+            Op_Integer, 1, 0, 0, NULL
+        )); // 在rr0存root_page(1)
+
+        list_append(ops, make_op(
+            Op_OpenWrite, 0, 0, 5, NULL
+        )); // 在cursor0打开根为rr0存的整数的页的表，有5列
+
+        list_append(ops, make_op(
+            Op_CreateTable, 4, 0, 0, NULL
+        )); // 新建一个table，并将rootpage存在rr4
+
+        list_append(ops, make_op(
+            Op_String, 5, 1, 0, "table"
+        )); // schema 表的第一列schema type
+
+        list_append(ops, make_op(
+            Op_String, strlen(sql_stmt->stmt.create->table->name), 2, 0, sql_stmt->stmt.create->table->name
+        )); // schema 表的第2列表名
+
+        list_append(ops, make_op(
+            Op_String, strlen(sql_stmt->stmt.create->table->name), 3, 0, sql_stmt->stmt.create->table->name
+        )); // schema 表的第3列关联表名
+
+        list_append(ops, make_op(
+            Op_String, strlen(sql_stmt->text), 5, 0, sql_stmt->text
+        )); // schema 表的第5列表创建SQL
+
+        list_append(ops, make_op(
+            Op_MakeRecord, 1, 5, 6, NULL
+        )); // 生成一条表记录
+
+        list_append(ops, make_op(
+            Op_Integer, list_size(&(stmt->db->schemas)) + 1, 7, 0, NULL
+        )); // 表记录的主键key
+
+        list_append(ops, make_op(
+            Op_Insert, 0, 6, 7, NULL
+        )); // 插入
+
+        list_append(ops, make_op(
+            Op_Close, 0, 0, 0, NULL
+        ));
     }
+    else {
+        list_t cols;
+        list_init(&cols);
+        int table_page = chidb_get_root_page_of_table(stmt->db->schemas, sql_stmt->stmt.create->index->table_name);
+        if(!table_page) {
+            return CHIDB_EINVALIDSQL;
+        }
+        chidb_get_columns_of_table(stmt->db->schemas, sql_stmt->stmt.create->index->table_name, &cols);
+        if(!chidb_check_column_exist(stmt->db->schemas, sql_stmt->stmt.create->index->table_name, sql_stmt->stmt.create->index->column_name)) {
+            return CHIDB_EINVALIDSQL;
+        }
+        int root_page = chidb_check_index_exist(stmt->db->schemas, sql_stmt->stmt.create->index->table_name, sql_stmt->stmt.create->index->column_name);
+        if(!root_page) {
+            return CHIDB_EINVALIDSQL;
+        }
+        int n_col = index_of_column(&cols, sql_stmt->stmt.create->index->column_name);
 
-    (sql_stmt->text)[strlen(sql_stmt->text)-1] = 0;
+        (sql_stmt->text)[strlen(sql_stmt->text)-1] = 0;
 
-    list_append(ops, make_op(
-        Op_Integer, 1, 0, 0, NULL
-    )); // 在rr0存root_page(1)
+        list_append(ops, make_op(
+            Op_Integer, 1, 0, 0, NULL
+        )); // 在rr0存root_page(1)
 
-    list_append(ops, make_op(
-        Op_OpenWrite, 0, 0, 5, NULL
-    )); // 在cursor0打开根为rr0存的整数的页的表，有5列
+        list_append(ops, make_op(
+            Op_OpenWrite, 0, 0, 5, NULL
+        )); // 在cursor0打开根为rr0存的整数的页的表，有5列
 
-    list_append(ops, make_op(
-        Op_CreateTable, 4, 0, 0, NULL
-    )); // 新建一个table，并将rootpage存在rr4
+        list_append(ops, make_op(
+            Op_CreateIndex, 4, 0, 0, NULL
+        )); // 新建一个index，并将rootpage存在rr4
 
-    list_append(ops, make_op(
-        Op_String, 5, 1, 0, "table"
-    )); // schema 表的第一列schema type
+        list_append(ops, make_op(
+            Op_String, 5, 1, 0, "index"
+        )); // schema 表的第一列schema type
 
-    list_append(ops, make_op(
-        Op_String, strlen(sql_stmt->stmt.create->table->name), 2, 0, sql_stmt->stmt.create->table->name
-    )); // schema 表的第2列表名
+        list_append(ops, make_op(
+            Op_String, strlen(sql_stmt->stmt.create->index->name), 2, 0, sql_stmt->stmt.create->index->name
+        )); // schema 表的第2列表名
 
-    list_append(ops, make_op(
-        Op_String, strlen(sql_stmt->stmt.create->table->name), 3, 0, sql_stmt->stmt.create->table->name
-    )); // schema 表的第3列关联表名
+        list_append(ops, make_op(
+            Op_String, strlen(sql_stmt->stmt.create->index->table_name), 3, 0, sql_stmt->stmt.create->index->table_name
+        )); // schema 表的第3列关联表名
 
-    list_append(ops, make_op(
-        Op_String, strlen(sql_stmt->text), 5, 0, sql_stmt->text
-    )); // schema 表的第5列表创建SQL
+        list_append(ops, make_op(
+            Op_String, strlen(sql_stmt->text), 5, 0, sql_stmt->text
+        )); // schema 表的第5列表创建SQL
 
-    list_append(ops, make_op(
-        Op_MakeRecord, 1, 5, 6, NULL
-    )); // 生成一条表记录
+        list_append(ops, make_op(
+            Op_MakeRecord, 1, 5, 6, NULL
+        )); // 生成一条表记录
 
-    list_append(ops, make_op(
-        Op_Integer, list_size(&(stmt->db->schemas)) + 1, 7, 0, NULL
-    )); // 表记录的主键key
+        list_append(ops, make_op(
+            Op_Integer, list_size(&(stmt->db->schemas)) + 1, 7, 0, NULL
+        )); // 表记录的主键key
 
-    list_append(ops, make_op(
-        Op_Insert, 0, 6, 7, NULL
-    )); // 插入
+        list_append(ops, make_op(
+            Op_Insert, 0, 6, 7, NULL
+        )); // 插入
 
-    list_append(ops, make_op(
-        Op_Close, 0, 0, 0, NULL
-    ));
+        list_append(ops, make_op(
+            Op_Close, 0, 0, 0, NULL
+        ));
+        
+        // 建立索引
+        int regi = 0;
+        list_append(ops, make_op(
+            Op_Integer, table_page, regi++, 0, NULL
+        )); // 在rr0存root_page(1)
 
+        list_append(ops, make_op(
+            Op_Integer, root_page, regi++, 0, NULL
+        )); 
+
+        list_append(ops, make_op(
+            Op_OpenRead, 0, 0, list_size(&cols), NULL
+        ));
+
+        chidb_dbm_op_t *table_rewind = make_op(Op_Rewind, 0, 0, 0, NULL);
+        list_append(ops, table_rewind);
+
+        list_append(ops, make_op(
+            Op_OpenWrite, 1, 1, 0, NULL
+        ));
+
+        int jmp_pc = list_size(ops);
+
+        list_append(ops, make_op(
+            Op_Key, 0, regi++, 0, NULL
+        ));
+
+        list_append(ops, make_op(
+            Op_Column, 0, n_col, regi++, NULL
+        ));
+
+        list_append(ops, make_op(
+            Op_IdxInsert, 1, regi-1, regi-2, NULL
+        ));
+
+        list_append(ops, make_op(
+            Op_Next, 0, jmp_pc, 0, NULL
+        ));
+
+        table_rewind->p2 = list_size(ops);
+
+        list_append(ops, make_op(
+            Op_Close, 0, 0, 0, NULL
+        ));
+
+        list_append(ops, make_op(
+            Op_Close, 1, 0, 0, NULL
+        ));
+
+        list_append(ops, make_op(
+            Op_Halt, 0, 0, 0, NULL
+        ));
+    }
     return CHIDB_OK;
 }
 

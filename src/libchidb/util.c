@@ -467,3 +467,24 @@ int index_of_column(list_t *columns, char *name)
     list_iterator_stop(columns);
     return -1;
 }
+
+int chidb_check_index_exist(list_t schema, char *table, char *colname)
+{
+    list_iterator_start(&schema);
+
+    while (list_iterator_hasnext(&schema))
+    {
+        chidb_schema_t *item = list_iterator_next(&schema);
+        // 存在则返回root_page
+        if (!strcmp(item->type, "index") && !strcmp(item->assoc, table) && !strcmp(item->stmt->stmt.create->index->column_name, colname))
+        {
+            int root_page = item->root_page;
+            list_iterator_stop(&schema);
+            return root_page;
+        }
+    }
+    list_iterator_stop(&schema);
+
+    // 不存在返回0
+    return 0;
+}
