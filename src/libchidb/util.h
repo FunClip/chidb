@@ -85,4 +85,7 @@ int chidb_get_columns_of_table(list_t schema, char *table, list_t *columns);
 int index_of_column(list_t *columns, char *name);
 
 void chisql_statement_free(chisql_statement_t *sql_stmt);
+
+int chidb_check_index_exist(list_t schema, char *table, char *colname);
+
 #endif /*UTIL_H_*/
